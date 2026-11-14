@@ -18,6 +18,7 @@ class Guardian:
     direction: Vec = field(default_factory=lambda: Vec(0, -1))
     weak_used: bool = False
     cycles: int = 0
+    charge_distance: float = 0
 
     def update(self, dt, player, arena, others=()):
         self.flash = max(0, self.flash - dt)
@@ -28,13 +29,16 @@ class Guardian:
                 self.pos, _ = arena.move(self.pos, self.direction * (68 * dt), self.radius)
             if self.timer <= 0:
                 self.direction = (player.pos - self.pos).normalized()
+                self.charge_distance = min(290, self.pos.distance(player.pos) + 20)
                 self.state, self.timer = "tell", 0.75
         elif self.state == "tell":
             if self.timer <= 0:
                 self.state, self.timer = "charge", 0.5
         elif self.state == "charge":
-            self.pos, blocked = arena.move(self.pos, self.direction * (580 * dt), self.radius, False)
-            if self.timer <= 0 or blocked:
+            distance = min(self.charge_distance, 580 * dt)
+            self.pos, blocked = arena.move(self.pos, self.direction * distance, self.radius, False)
+            self.charge_distance = max(0, self.charge_distance - distance)
+            if self.timer <= 0 or blocked or self.charge_distance <= 0:
                 self.state, self.timer, self.weak_used = "weak", 1.1, False
         elif self.state == "weak":
             if self.timer <= 0:

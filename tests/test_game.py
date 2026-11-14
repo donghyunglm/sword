@@ -106,6 +106,15 @@ class GameTests(unittest.TestCase):
         self.game.update(0.1)
         self.assertFalse(self.path.exists())
 
+    def test_upgrade_restores_health_for_next_round(self):
+        g = self.game
+        g.new_game()
+        g.combat.player.hp = 1
+        g.gate_open = True
+        g.enter_gate()
+        g.choose_upgrade(0)
+        self.assertEqual(g.combat.player.hp, 6)
+
 
 if __name__ == "__main__":
     unittest.main()

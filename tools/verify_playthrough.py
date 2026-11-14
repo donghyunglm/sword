@@ -1,0 +1,105 @@
+"""키 입력과 같은 로직 호출만 사용하는 결정적 자동 플레이 진단.
+
+체력/피해/처치 수를 변경하지 않는다. 봇의 승리는 게임성 평가를 대신하지 않는다.
+"""
+
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from game import Game
+from geometry import Vec, path_hits
+
+
+def steer(arena, pos, desired, radius=14):
+    candidates = [desired, Vec(-desired.y, desired.x), Vec(desired.y, -desired.x), desired * -1]
+    return next((v for v in candidates if arena.valid(pos + v * 35, radius)), Vec())
+
+
+def run(start=0):
+    game = Game(Path(__file__).resolve().parents[1] / ".cache/playthrough.json")
+    game.new_game()
+    if start:
+        game.load_stage(start, {"range": 2, "lifetime": 1, "speed": 1})
+    defeated, seen, previous = 0, [], -1
+    for tick in range(120 * 600):
+        if game.index != previous:
+            previous = game.index
+            seen.append(game.stage["id"])
+            print("ENTER", game.stage["id"])
+        if game.mode == "victory":
+            print("PLAYTHROUGH OK:", " / ".join(seen), "재도전", defeated)
+            return True
+        if game.mode == "upgrade":
+            game.choose_upgrade(0 if game.combat.player.upgrades["range"] < 3 else 1)
+            continue
+        if game.mode == "defeat":
+            defeated += 1
+            print("RETRY", game.stage["id"])
+            if defeated > 8:
+                break
+            game.retry()
+            continue
+        c, player = game.combat, game.combat.player
+        direction = Vec()
+        if game.gate_open:
+            direction = (Vec(560, 604) - player.pos).normalized()
+        elif c.enemies:
+            wolves = [e for e in c.enemies if e.kind == "wolf"]
+            target = min(wolves or c.enemies, key=lambda e: e.pos.distance(player.pos))
+            delta = target.pos - player.pos
+            distance = delta.length()
+            if target.kind in ("guardian", "boar"):
+                if target.state == "tell" and target.timer < 0.16 and c.ready:
+                    side = Vec(-target.direction.y, target.direction.x)
+                    options = [side, side * -1]
+                    direction = max(options, key=lambda d: int(c.arena.valid(player.pos + d * 180, player.radius)))
+                    player.facing = direction
+                    c.dash()
+                elif target.state in ("approach", "chase"):
+                    # 돌진을 맞을 위치로 유도하되 너무 가까워지지 않는다.
+                    direction = delta.normalized() if distance > 210 else delta.normalized() * -1 if distance < 150 else Vec()
+                vulnerable = target.state == "weak" if target.kind == "guardian" else target.state in ("charge", "recover")
+                if c.trail and not player.dash_left and vulnerable:
+                    if path_hits(c.trail.points, target.pos, player.slash_radius + target.radius):
+                        c.slash()
+            else:
+                if c.ready and distance < 185:
+                    player.facing = delta.normalized()
+                    c.dash()
+                if c.trail and not player.dash_left:
+                    hit = any(path_hits(c.trail.points, e.pos, player.slash_radius + e.radius) for e in c.enemies)
+                    if hit or c.trail.remaining < 0.12:
+                        c.slash()
+                direction = delta.normalized() if distance > 205 else delta.normalized() * -1
+                if target.state in ("tell", "charge") and distance < 240:
+                    direction = Vec(-target.direction.y, target.direction.x)
+            threats = []
+            for e in c.enemies:
+                if e.kind != "boar" or e.state != "charge":
+                    continue
+                offset = player.pos - e.pos
+                along = offset.x * e.direction.x + offset.y * e.direction.y
+                across = abs(offset.x * e.direction.y - offset.y * e.direction.x)
+                if -25 < along < 270 and across < e.radius + player.radius + 24:
+                    threats.append(e)
+            if threats:
+                e = min(threats, key=lambda b: b.pos.distance(player.pos))
+                perpendicular = Vec(-e.direction.y, e.direction.x)
+                options = [perpendicular, perpendicular * -1]
+                direction = max(options, key=lambda d: (
+                    int(c.arena.valid(player.pos + d * 100, player.radius)),
+                    min((player.pos + d * 80).distance(b.pos) for b in c.enemies)))
+                if c.ready:
+                    player.facing = direction
+                    c.dash()
+            direction = steer(c.arena, player.pos, direction)
+        game.update(1 / 120, direction)
+        c.events.clear()
+    print("PLAYTHROUGH INCOMPLETE:", game.stage["id"], game.mode, "HP", game.combat.player.hp,
+          "kills", game.combat.kills, "seconds", round(game.combat.elapsed, 1))
+    return False
+
+
+if __name__ == "__main__":
+    raise SystemExit(0 if run() else 1)

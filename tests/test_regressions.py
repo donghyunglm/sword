@@ -66,6 +66,28 @@ class RegressionTests(unittest.TestCase):
         self.advance(c, 0.15)
         self.assertEqual(c.player.hp, 6)
 
+    def test_boss_dodge_trail_reaches_weakness_before_expiry(self):
+        c = Combat()
+        boss = Guardian(1, Vec(560, 490))
+        c.enemies = [boss]
+        for _ in range(400):
+            c.update(1 / 120)
+            if boss.state == "tell" and boss.timer <= 0.15:
+                break
+        c.player.facing = Vec(1, 0)
+        self.assertTrue(c.dash())
+        for _ in range(150):
+            c.update(1 / 120)
+            if boss.state == "weak":
+                break
+        self.assertEqual(boss.state, "weak")
+        self.assertIsNotNone(c.trail)
+        self.assertTrue(c.slash())
+        self.advance(c, 0.08)
+        self.assertEqual(boss.hp, 14)
+        self.assertEqual(c.player.hp, 6)
+        self.assertTrue(c.ready)
+
 
 if __name__ == "__main__":
     unittest.main()

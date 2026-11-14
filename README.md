@@ -12,7 +12,7 @@ Python + **pico2d**로 구현한 2D 탑다운 액션 게임이다.
 - 다중 적중(2마리 이상)과 보스 약점 성공 시 즉시 재대시. 빗나감 0.8초, 단일 적중 0.5초 대기.
 - 수호수: 접근, 돌진 예고, 직선 돌진, 금빛 약점, 회복. 약점 창마다 1회 피해.
 - 참격 범위 / 잔영 유지 / 이동 속도, **선택 강화 3종**, 각 최대 3단계.
-- 실패 시 해당 라운드 시작 상태로 재도전. 출구 진입 후 강화 선택 시 체력 2 회복.
+- 실패 시 해당 라운드 시작 상태로 재도전. 출구 진입 후 강화 선택 시 체력 완전 회복.
 - 타이틀, 이어하기, 일시정지, 연습장, 실패·클리어 화면.
 - 자동 진행 저장과 최초 완료 보상 중복 방지. 손상된 저장은 보존하고 안내.
 - 간단한 픽셀 임시 그래픽과 합성 효과음. 이미지 없이 실행 가능.
@@ -102,9 +102,14 @@ py -m venv .venv
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 .\.venv\Scripts\python.exe main.py --smoke-test --scene play --frames 60 --capture artifacts/play.png
+.\.venv\Scripts\python.exe tools/verify_runtime.py
+.\.venv\Scripts\python.exe tools/verify_playthrough.py
 ```
 
 스모크 테스트는 실제 SDL/pico2d 창과 텍스트·도형 렌더링을 확인한 뒤 자동 종료한다.
 선택 가능한 장면: `title`, `play`, `boss`, `upgrade`, `defeat`, `victory`.
 자동 테스트에서는 실제 저장 대신 별도 임시 경로를 사용한다.
+`verify_runtime.py`는 키 이벤트를 주입해 실제 입력 루프를 검사하고 창을 자동 종료한다.
+`verify_playthrough.py`는 체력·피해·처치 수를 조작하지 않는 단순 봇으로 5라운드 진행을 확인한다.
+봇 검사는 사람이 느끼는 재미나 난이도의 검증을 대신하지 않는다.
 참고: [pico2d 프로젝트](https://github.com/2DGP/pico2d), [패키지 배포](https://pypi.org/project/pico2d/).

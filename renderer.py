@@ -321,7 +321,7 @@ class Renderer:
                 y = 414 - i * 95
                 self.text(f"{i + 1}   {name}", 247, y, 26, GOLD if level < C.UPGRADE_LIMIT else MUTED)
                 self.text(f"{level} / {C.UPGRADE_LIMIT} 단계    {detail}", 520, y, 20, MUTED)
-            self.center("강화 확정 후 체력 2 회복 / 다음 라운드로 이동", 121, 18, CYAN)
+            self.center("강화 확정 후 체력 완전 회복 / 다음 라운드로 이동", 121, 18, CYAN)
             if game.toast_left > 0:
                 self.center(game.toast, 166, 18, RED)
         elif game.mode == "defeat":

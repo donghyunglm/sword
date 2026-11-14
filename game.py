@@ -121,7 +121,7 @@ class Game:
             return False
         levels = dict(p.upgrades)
         levels[key] += 1
-        hp = min(C.MAX_HP, p.hp + 2)
+        hp = C.MAX_HP
         self.load_stage(self.index + 1, levels, hp)
         return True
 
