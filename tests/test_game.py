@@ -1,0 +1,111 @@
+import copy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from game import Game
+from geometry import Vec
+from boss import Guardian
+from save_data import read_save, validate
+from stage import load_stages
+
+
+class GameTests(unittest.TestCase):
+    def setUp(self):
+        test_root = Path(__file__).resolve().parents[1] / ".cache" / "tests"
+        test_root.mkdir(parents=True, exist_ok=True)
+        self.tmp = tempfile.TemporaryDirectory(dir=test_root)
+        self.addCleanup(self.tmp.cleanup)
+        self.path = Path(self.tmp.name) / "progress.json"
+        self.game = Game(self.path)
+
+    def test_stage_data_has_five_valid_rounds(self):
+        self.assertEqual(len(load_stages()), 5)
+
+    def test_pause_freezes_all_combat_timers(self):
+        g = self.game
+        g.new_game()
+        g.combat.dash()
+        g.paused = True
+        before = copy.deepcopy(g.combat.__dict__)
+        g.update(0.5, Vec(1, 0))
+        self.assertEqual(g.combat.elapsed, before["elapsed"])
+        self.assertEqual(g.combat.player.dash_left, before["player"].dash_left)
+
+    def test_seal_requires_kills_not_waiting(self):
+        g = self.game
+        g.new_game()
+        for _ in range(240):
+            g.update(1 / 120)
+        self.assertFalse(g.gate_open)
+        g.combat.kills = g.stage["goal"]
+        g.update(1 / 120)
+        self.assertTrue(g.gate_open)
+        self.assertEqual(g.mode, "play")
+
+    def test_reward_continue_and_retry_do_not_duplicate(self):
+        g = self.game
+        g.new_game()
+        g.gate_open = True
+        g.enter_gate()
+        self.assertEqual(g.mode, "upgrade")
+        self.assertFalse(g.enter_gate())
+        continued = Game(self.path)
+        continued.continue_game()
+        self.assertEqual(continued.mode, "upgrade")
+        continued.choose_upgrade(0)
+        self.assertEqual(continued.index, 1)
+        self.assertEqual(continued.combat.player.upgrades["range"], 1)
+        self.assertFalse(continued.choose_upgrade(0))
+        continued.combat.player.hp = 0
+        continued.mode = "defeat"
+        continued.retry()
+        self.assertEqual(continued.cleared, [0])
+        self.assertEqual(sum(continued.combat.player.upgrades.values()), 1)
+        self.assertEqual(continued.combat.kills, 0)
+
+    def test_fifth_round_finishes_campaign_without_loop(self):
+        g = self.game
+        g.new_game()
+        for i in range(5):
+            self.assertEqual(g.index, i)
+            g.gate_open = True
+            g.enter_gate()
+            if i < 4:
+                g.choose_upgrade(i % 3)
+        self.assertEqual(g.mode, "victory")
+        self.assertEqual(g.index, 4)
+        restored = Game(self.path)
+        restored.continue_game()
+        self.assertEqual(restored.mode, "victory")
+
+    def test_boss_weakness_once_per_window(self):
+        b = Guardian(1, Vec(560, 490))
+        self.assertFalse(b.receive_slash())
+        b.state = "weak"
+        self.assertTrue(b.receive_slash())
+        self.assertFalse(b.receive_slash())
+        self.assertEqual(b.hp, 14)
+
+    def test_corrupted_save_is_preserved(self):
+        self.path.write_text("{broken", encoding="utf-8")
+        save, message = read_save(self.path)
+        self.assertIsNone(save)
+        self.assertTrue(message)
+        self.assertEqual(self.path.read_text(), "{broken")
+
+    def test_invalid_save_types_are_rejected(self):
+        self.game.new_game()
+        data = self.game.snapshot()
+        data["upgrades"]["range"] = True
+        with self.assertRaises(ValueError):
+            validate(data)
+
+    def test_training_does_not_write_save(self):
+        self.game.start_training()
+        self.game.update(0.1)
+        self.assertFalse(self.path.exists())
+
+
+if __name__ == "__main__":
+    unittest.main()
