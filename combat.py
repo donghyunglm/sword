@@ -82,6 +82,7 @@ class Combat:
         p = self.player
         p.cooldown = max(0, p.cooldown - dt)
         p.invulnerable = max(0, p.invulnerable - dt)
+        p.moving = movement.length() > 0 or p.dash_left > 0
         if p.dash_left > 0:
             active = min(dt, p.dash_left)
             p.pos, blocked = self.arena.move(p.pos, p.facing * (C.DASH_SPEED * active), p.radius, False)

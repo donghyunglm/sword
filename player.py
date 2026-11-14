@@ -12,6 +12,7 @@ class Player:
     invulnerable: float = 0
     dash_left: float = 0
     cooldown: float = 0
+    moving: bool = False
     upgrades: dict = field(default_factory=lambda: dict.fromkeys(C.UPGRADES, 0))
 
     @property
