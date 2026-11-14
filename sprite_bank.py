@@ -23,6 +23,21 @@ class SpriteBank:
                     frames = int(settings.get("frames", 1))
                     if fw <= 0 or fh <= 0 or frames <= 0 or frames * fw > img.w or fh > img.h:
                         raise ValueError("프레임 크기가 이미지 범위를 벗어났습니다.")
+                    animations = settings.get("animations", {})
+                    if not isinstance(animations, dict):
+                        raise ValueError("animations는 객체여야 합니다.")
+                    directions = settings.get("direction_order", ["down", "left", "right", "up"])
+                    if not isinstance(directions, list) or not directions or len(set(directions)) != len(directions):
+                        raise ValueError("direction_order가 올바르지 않습니다.")
+                    for state, animation in animations.items():
+                        if not isinstance(animation, dict):
+                            raise ValueError(f"{state}: 애니메이션 설정이 올바르지 않습니다.")
+                        row = int(animation["row"])
+                        count = int(animation["frames"])
+                        fps = float(animation.get("fps", settings.get("fps", 8)))
+                        row_count = len(directions) if animation.get("directions", True) else 1
+                        if row < 0 or count < 1 or count * fw > img.w or (row + row_count) * fh > img.h or fps < 0:
+                            raise ValueError(f"{state}: 시트 범위를 벗어났습니다.")
                     self.entries[name] = img, settings, fw, fh, frames
                 except (OSError, ValueError, TypeError, KeyError) as error:
                     self.warnings.append(f"{name}: {error}")
@@ -33,15 +48,28 @@ class SpriteBank:
         if name not in self.entries:
             return False
         image, config, fw, fh, frames = self.entries[name]
+        facing = None
+        if direction:
+            facing = ("right" if direction.x > 0 else "left") if abs(direction.x) > abs(direction.y) else ("up" if direction.y > 0 else "down")
+        animation = config.get("animations", {}).get(state)
+        if animation is None:
+            animation = config.get("animations", {}).get("idle")
         row = 0
         rows = config.get("direction_rows", {})
-        if rows and direction:
-            facing = ("right" if direction.x > 0 else "left") if abs(direction.x) > abs(direction.y) else ("up" if direction.y > 0 else "down")
+        if rows and facing:
             row = int(rows.get(facing, 0))
-        row = int(config.get("state_rows", {}).get(state, row))
+        if animation is not None:
+            row = int(animation["row"])
+            if animation.get("directions", True) and facing:
+                directions = config.get("direction_order", ["down", "left", "right", "up"])
+                row += directions.index(facing) if facing in directions else 0
+            frames = int(animation["frames"])
+            fps = float(animation.get("fps", config.get("fps", 8)))
+        else:
+            row = int(config.get("state_rows", {}).get(state, row))
+            fps = max(0, float(config.get("fps", 8)))
         if row < 0 or (row + 1) * fh > image.h:
             row = 0
-        fps = max(0, float(config.get("fps", 8)))
         frame = int(time * fps) % frames
         bottom = image.h - (row + 1) * fh
         width = float(config.get("draw_width", fw * 2)) * scale
