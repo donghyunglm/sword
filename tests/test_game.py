@@ -19,8 +19,8 @@ class GameTests(unittest.TestCase):
         self.path = Path(self.tmp.name) / "progress.json"
         self.game = Game(self.path)
 
-    def test_stage_data_has_five_valid_rounds(self):
-        self.assertEqual(len(load_stages()), 5)
+    def test_stage_data_has_fifteen_valid_rounds(self):
+        self.assertEqual(len(load_stages()), 15)
 
     def test_pause_freezes_all_combat_timers(self):
         g = self.game
@@ -38,6 +38,9 @@ class GameTests(unittest.TestCase):
         for _ in range(240):
             g.update(1 / 120)
         self.assertFalse(g.gate_open)
+        for _ in range(600):
+            g.update(1 / 120)
+        g.combat.enemies.clear()
         g.combat.kills = g.stage["goal"]
         g.update(1 / 120)
         self.assertTrue(g.gate_open)
@@ -64,17 +67,18 @@ class GameTests(unittest.TestCase):
         self.assertEqual(sum(continued.combat.player.upgrades.values()), 1)
         self.assertEqual(continued.combat.kills, 0)
 
-    def test_fifth_round_finishes_campaign_without_loop(self):
+    def test_fifteenth_round_finishes_campaign_without_loop(self):
         g = self.game
         g.new_game()
-        for i in range(5):
+        for i in range(15):
             self.assertEqual(g.index, i)
             g.gate_open = True
             g.enter_gate()
-            if i < 4:
-                g.choose_upgrade(i % 3)
+            if i < 14:
+                if not g.choose_upgrade(i % 3):
+                    g.skip_upgrade()
         self.assertEqual(g.mode, "victory")
-        self.assertEqual(g.index, 4)
+        self.assertEqual(g.index, 14)
         restored = Game(self.path)
         restored.continue_game()
         self.assertEqual(restored.mode, "victory")

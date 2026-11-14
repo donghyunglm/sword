@@ -148,6 +148,8 @@ def main(argv=None):
                     elif game.mode == "upgrade":
                         if key in (pico.SDLK_1, pico.SDLK_2, pico.SDLK_3):
                             game.choose_upgrade(key - pico.SDLK_1)
+                        elif key == pico.SDLK_RETURN:
+                            game.skip_upgrade()
                         elif key == pico.SDLK_q:
                             game.exit_to_title()
                     elif game.mode == "defeat":

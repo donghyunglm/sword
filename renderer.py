@@ -1,4 +1,4 @@
-"""pico2d 출력 전용. 임시 픽셀 캐릭터는 게임 판정과 독립적이다."""
+"""pico2d 출력 전용. 매끈한 2D 임시 도형은 게임 판정과 독립적이다."""
 
 import math
 import random
@@ -109,47 +109,61 @@ class Renderer:
                 col = end
 
     def actor(self, kind, pos, direction, state="idle", ghost=False, alpha=255, flash=False):
-        scale = 6 if kind == "guardian" else 3
+        scale = 2 if kind in ("guardian", "knight", "dragon") else 1
         if not ghost:
-            rect(pos.x - 18 * scale / 3, pos.y - 15, 36 * scale / 3, 10, (4, 12, 19), 105)
+            circle(pos + Vec(0, -9), 19 * scale, INK, 110, True)
         if self.bank.draw("player" if ghost else kind, pos, self.visual_time, direction, state,
-                          alpha / 255, scale / 3):
+                          alpha / 255, scale):
             return
-        pattern = HERO if kind == "player" else WOLF if kind == "wolf" else BOAR
-        bob = math.sin(self.visual_time * 12) * 1.2 if state in ("walk", "chase", "charge") else 0
-        self.pixel(pattern, pos, scale, ghost, alpha, flash, bob)
+        direction = direction.normalized() if direction.length() else Vec(0, -1)
+        side = Vec(-direction.y, direction.x)
+        color = WHITE if flash else CYAN if ghost else {
+            "player": (93, 172, 196), "wolf": (127, 92, 150), "boar": (151, 99, 123),
+            "mage": (154, 107, 202), "sentinel": (184, 120, 112),
+            "guardian": (134, 89, 151), "knight": (160, 165, 181),
+            "dragon": (137, 79, 155)}.get(kind, VIOLET)
+        center = pos + Vec(0, 7 * scale)
+        circle(center, 15 * scale, color, alpha, True)
+        circle(center + direction * (7 * scale), 8 * scale, WHITE if flash else (29, 41, 58), alpha, True)
+        if kind in ("wolf", "boar", "guardian", "dragon", "sentinel"):
+            for sign in (-1, 1):
+                ear = center - direction * (7 * scale) + side * (sign * 10 * scale)
+                circle(ear, 5 * scale, color, alpha, True)
+        if kind in ("mage", "knight"):
+            circle(center, 18 * scale, GOLD if state == "weak" else color, 80, False)
+        if kind == "dragon":
+            for sign in (-1, 1):
+                wing = center + side * (sign * 27 * scale)
+                circle(wing, 12 * scale, color, alpha // 2, True)
         if kind == "player":
-            # 스카프와 검은 임시 연출. 나중에는 시트의 dash/slash 행으로 교체 가능.
-            a = pos + Vec(13, 5)
-            length = 28 if state == "slash" else 22
-            b = a + direction * length
-            line(a, b, CYAN if ghost else WHITE, alpha)
-            line(a + Vec(1, 0), b + Vec(1, 0), CYAN, alpha)
-            line(a + Vec(-3, -2), a + Vec(4, 4), GOLD, alpha)
+            grip = center + side * 12
+            line(grip, grip + direction * (31 if state == "slash" else 23), CYAN if ghost else WHITE, alpha)
+            circle(center + direction * 7, 5, GOLD, alpha, True)
 
     def floor(self, game):
         rect(0, 0, C.WIDTH, C.HEIGHT, INK)
-        rect(30, 98, 1060, 536, (15, 35, 35))
-        if not self.bank.draw("forest", Vec(560, 366), 0, scale=1):
-            for x in range(40, 1080, 40):
-                for y in range(108, 624, 40):
-                    parity = (x // 40 + y // 40) % 3
-                    rect(x, y, 39, 39, [(23, 47, 42), (25, 49, 43), (24, 46, 42)][parity])
+        theme = game.stage.get("theme", "forest")
+        base = {"forest": (25, 48, 45), "fortress": (42, 43, 60),
+                "sanctuary": (40, 38, 60)}[theme]
+        rect(30, 98, 1060, 536, base)
+        if not self.bank.draw(theme, Vec(560, 366), 0, scale=1):
             for x, y, tone in self.grass:
-                rect(x, y, 3 + tone, 2, (36, 67 + tone * 7, 53))
-        # 경계의 나무는 시각 연출이며 이동 가능 영역은 Arena.bounds와 일치한다.
-        for x in range(28, 1100, 64):
-            for y in (91, 639):
-                rect(x - 9, y - 12, 18, 22, (25, 36, 34))
-                rect(x - 24, y, 48, 16, (26, 68, 52))
-                rect(x - 18, y + 12, 36, 14, (34, 83, 59))
-                rect(x - 10, y + 24, 20, 7, (43, 95, 65))
+                if theme == "forest":
+                    circle(Vec(x, y), 2 + tone, (49, 89, 69), 90, True)
+                else:
+                    circle(Vec(x, y), 2 + tone, VIOLET if theme == "sanctuary" else MUTED, 35, True)
+            for x in range(92, 1050, 120):
+                for y in (153, 555):
+                    circle(Vec(x, y), 18 if theme == "forest" else 10,
+                           (45, 84, 67) if theme == "forest" else (73, 72, 92), 120, True)
+        for x in range(42, 1080, 65):
+            for y in (105, 626):
+                circle(Vec(x, y), 15 if theme == "forest" else 9,
+                       (39, 76, 59) if theme == "forest" else (93, 89, 111), 200, True)
         for wall in game.combat.arena.walls:
-            rect(wall.x - 3, wall.y - 5, wall.w + 6, wall.h + 7, (7, 23, 26))
-            rect(wall.x, wall.y, wall.w, wall.h, (55, 72, 72))
-            rect(wall.x + 3, wall.y + wall.h - 9, wall.w - 6, 7, (89, 106, 96))
-            for x in range(int(wall.x + 8), int(wall.x + wall.w - 4), 16):
-                rect(x, wall.y + 8, 7, 4, (38, 68, 51))
+            rect(wall.x - 3, wall.y - 5, wall.w + 6, wall.h + 7, INK)
+            rect(wall.x, wall.y, wall.w, wall.h, (61, 77, 79) if theme == "forest" else (81, 79, 101))
+            rect(wall.x + 3, wall.y + wall.h - 9, wall.w - 6, 7, MUTED, 55)
         gate_color = CYAN if game.gate_open else VIOLET
         rect(510, 588, 100, 40, (12, 23, 32))
         rect(508, 586, 9, 44, gate_color)
@@ -180,6 +194,24 @@ class Renderer:
 
     def scene(self, game):
         combat = game.combat
+        if game.hazard_marker is not None:
+            color = RED if game.hazard_active else GOLD
+            circle(game.hazard_marker, 78, color, 105 if game.hazard_active else 190)
+            circle(game.hazard_marker, 70, color, 45, True)
+        for device in combat.devices:
+            color = WHITE if device.flash else GOLD if device.kind == "terminal" else VIOLET
+            circle(device.pos, device.radius + 7, color, 90)
+            circle(device.pos, device.radius, color, 180, True)
+            circle(device.pos, device.radius - 9, INK, 220, True)
+            if device.kind == "crystal":
+                circle(device.pos, 7, color, 220, True)
+                if device.hp > 1:
+                    circle(device.pos, device.radius + 11, color, 180)
+            else:
+                self.text(device.link, device.pos.x - 5, device.pos.y - 8, 16, color)
+        for bullet in combat.projectiles:
+            circle(bullet.pos, bullet.radius + 5, VIOLET, 85, True)
+            circle(bullet.pos, bullet.radius, WHITE, 230, True)
         if combat.trail:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
@@ -190,7 +222,7 @@ class Renderer:
                 self.actor("player", pos, trail.direction, ghost=True, alpha=alpha)
         for enemy in combat.enemies:
             if enemy.state == "tell":
-                length = 290 if enemy.kind == "guardian" else 230
+                length = 290 if enemy.kind in ("guardian", "knight") else 230
                 end = enemy.pos + enemy.direction * length
                 side = Vec(-enemy.direction.y, enemy.direction.x) * enemy.radius
                 color = RED if enemy.kind == "guardian" else GOLD
@@ -198,8 +230,18 @@ class Renderer:
                 line(enemy.pos + side, end + side, color, 170)
                 line(end - side, end + side, color, 170)
                 circle(enemy.pos, enemy.radius + 7, color, 180)
-            if enemy.kind == "guardian" and enemy.state == "weak":
+            if enemy.kind in ("guardian", "knight", "dragon") and enemy.state == "weak":
                 circle(enemy.pos, enemy.radius + 7, GOLD, 160)
+            if enemy.kind == "dragon" and enemy.state in ("tell", "attack"):
+                color = RED if enemy.state == "attack" else GOLD
+                if enemy.attack == "stomp":
+                    circle(enemy.marker, 90, color, 180)
+                    circle(enemy.marker, 90, color, 35, True)
+                else:
+                    side = Vec(-enemy.direction.y, enemy.direction.x) * 56
+                    end = enemy.pos + enemy.direction * 440
+                    line(enemy.pos - side, end - side, color, 180)
+                    line(enemy.pos + side, end + side, color, 180)
             if enemy.state == "charge":
                 line(enemy.pos - enemy.direction * 40, enemy.pos, GOLD, 120)
         actors = [(e.pos.y, e) for e in combat.enemies]
@@ -216,7 +258,7 @@ class Renderer:
                 state, direction, alpha = actor.state, actor.direction, 255
             self.actor(kind, actor.pos, direction, state, alpha=alpha,
                        flash=not is_player and actor.flash > 0)
-            if not is_player and actor.kind == "boar" and actor.hp == 1:
+            if not is_player and actor.kind in ("boar", "sentinel") and actor.hp == 1:
                 rect(actor.pos.x - 11, actor.pos.y + 37, 22, 3, RED)
             if self.debug:
                 circle(actor.pos, actor.radius, GOLD if is_player else RED, 200)
@@ -260,16 +302,18 @@ class Renderer:
             self.text(f"잔영 {c.trail.remaining:.1f}초", 450, 731, 18, CYAN)
         if c.prism:
             self.text("PRISM / 다음 참격 확대", 720, 667, 16, GOLD)
-        bosses = [e for e in c.enemies if e.kind == "guardian"]
+        bosses = [e for e in c.enemies if e.kind in ("guardian", "knight", "dragon")]
         if bosses:
             boss = bosses[0]
             rect(300, 591, 520, 13, (30, 20, 37))
             rect(300, 591, 520 * boss.hp / boss.max_hp, 13, VIOLET)
-            self.text("수호수  /  " + {"tell": "돌진 예고", "charge": "돌진", "weak": "약점! J 참격", "recover": "회복", "approach": "접근"}[boss.state], 360, 616, 18, GOLD if boss.state == "weak" else WHITE)
+            label = {"guardian": "숲의 수호수", "knight": "봉인 수호기사", "dragon": "침식된 드래곤"}[boss.kind]
+            state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! J 참격", "recover": "회복", "approach": "대기"}[boss.state]
+            self.text(label + "  /  " + state, 360, 616, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, INK)
         self.text("WASD / 방향키  이동     Space  대시     J  잔영 참격", 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
-        self.text("TEMP ART / 교체 가능", 850, 25, 14, MUTED)
+        self.text("임시 2D 그래픽 / 교체 가능", 850, 25, 14, MUTED)
         if game.toast_left > 0:
             rect(160, 120, 800, 43, INK, 230)
             self.center(game.toast, 143, 18, GOLD)
@@ -283,7 +327,7 @@ class Renderer:
         rect(0, 78, C.WIDTH, 582, INK, 240)
 
     def title(self, game):
-        # 단순한 임시 픽셀 타이틀 연출. 실제 게임과 같은 스프라이트를 사용한다.
+        # 임시 2D 타이틀 연출. 실제 게임과 같은 스프라이트를 사용한다.
         for i in range(4):
             pos = Vec(690 + i * 70, 420 + i * 16)
             self.actor("player", pos, Vec(1, 0), ghost=i < 3, alpha=60 + i * 55)
@@ -293,7 +337,7 @@ class Renderer:
         self.text("Enter   새 모험", 94, 310, 26, WHITE)
         self.text("C          이어하기" + ("" if game.saved else "  (기록 없음)"), 94, 262, 23, CYAN if game.saved else MUTED)
         self.text("T          잔영 검술 연습장", 94, 215, 23, GOLD)
-        self.text("숲 5라운드 / 늑대·멧돼지 / 수호수 보스 / 선택 강화 3종", 92, 145, 18, MUTED)
+        self.text("숲·요새·성역 15라운드 / 수호기사·드래곤 / 선택 강화", 92, 145, 18, MUTED)
         if game.saved:
             self.text("새 모험은 기존 진행을 새로 시작합니다.", 92, 109, 16, RED)
         if game.notice:
@@ -321,7 +365,10 @@ class Renderer:
                 y = 414 - i * 95
                 self.text(f"{i + 1}   {name}", 247, y, 26, GOLD if level < C.UPGRADE_LIMIT else MUTED)
                 self.text(f"{level} / {C.UPGRADE_LIMIT} 단계    {detail}", 520, y, 20, MUTED)
-            self.center("강화 확정 후 체력 완전 회복 / 다음 라운드로 이동", 121, 18, CYAN)
+            if all(level >= C.UPGRADE_LIMIT for level in game.combat.player.upgrades.values()):
+                self.center("모든 강화 완료 / Enter로 다음 라운드", 121, 18, CYAN)
+            else:
+                self.center("강화 확정 후 체력 완전 회복 / 다음 라운드로 이동", 121, 18, CYAN)
             if game.toast_left > 0:
                 self.center(game.toast, 166, 18, RED)
         elif game.mode == "defeat":
@@ -332,11 +379,11 @@ class Renderer:
             self.center("Q   타이틀로", 248, 20, GOLD)
         elif game.mode == "victory":
             self.shade()
-            self.center("첫 번째 봉인 해제", 497, 42, CYAN)
-            self.center("숲의 수호수를 정화했습니다", 429, 26, WHITE)
-            self.center("숲 5라운드 클리어", 369, 23, GOLD)
+            self.center("세 봉인 해제", 497, 42, CYAN)
+            self.center("드래곤의 침식을 정화했습니다", 429, 26, WHITE)
+            self.center("15라운드 모험 완료", 369, 23, GOLD)
             self.center(f"최대 동시 적중  {max(game.records['hits'], game.combat.max_hits)}", 310, 20, MUTED)
-            self.center("현재 버전은 숲 지역까지입니다. 요새와 드래곤은 확장 기획입니다.", 244, 18, MUTED)
+            self.center("숲에서 배운 잔영 검술로 성역의 재앙을 끝냈습니다.", 244, 18, MUTED)
             self.center("Enter / Q   타이틀로", 172, 23, CYAN)
 
     def draw(self, game):

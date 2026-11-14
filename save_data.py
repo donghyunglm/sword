@@ -8,7 +8,10 @@ import config as C
 DEFAULT_PATH = Path(__file__).resolve().parent / "saves" / "progress.json"
 
 
-def validate(data, stage_count=5):
+def validate(data, stage_count=None):
+    if stage_count is None:
+        from stage import load_stages
+        stage_count = len(load_stages())
     if not isinstance(data, dict) or data.get("version") != 1:
         raise ValueError("지원하지 않는 저장 형식입니다.")
     index = data.get("stage")

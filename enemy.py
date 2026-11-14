@@ -14,16 +14,28 @@ class Enemy:
     flash: float = 0
     attack_wait: float = 0.7
     direction: Vec = field(default_factory=Vec)
+    projectile_request: bool = False
 
     @classmethod
     def make(cls, uid, kind, pos):
-        return cls(uid, kind, pos, hp=2 if kind == "boar" else 1,
-                   radius=20 if kind == "boar" else 16)
+        if kind not in ("wolf", "boar", "mage", "sentinel"):
+            raise ValueError(f"알 수 없는 적: {kind}")
+        return cls(uid, kind, pos, hp=2 if kind in ("boar", "sentinel") else 1,
+                   radius=20 if kind in ("boar", "sentinel") else 16)
 
     def update(self, dt, player, arena, others=()):
         self.flash = max(0, self.flash - dt)
         self.attack_wait = max(0, self.attack_wait - dt)
         delta = player.pos - self.pos
+
+        if self.kind == "mage":
+            if self.attack_wait <= 0:
+                self.direction = delta.normalized()
+                self.projectile_request = True
+                self.attack_wait = 1.9
+            desired = delta.normalized() * (-1 if delta.length() < 200 else 1 if delta.length() > 300 else 0)
+            self.pos, _ = arena.move(self.pos, desired * (65 * dt), self.radius)
+            return
         if self.state == "tell":
             self.timer -= dt
             if self.timer <= 0:
@@ -40,7 +52,7 @@ class Enemy:
             if self.timer <= 0:
                 self.state, self.attack_wait = "chase", 1.1
             return
-        if self.kind == "boar" and delta.length() < 290 and self.attack_wait <= 0:
+        if self.kind in ("boar", "sentinel") and delta.length() < 290 and self.attack_wait <= 0:
             self.state, self.timer, self.direction = "tell", 0.65, delta.normalized()
             return
         desired = delta.normalized()
@@ -51,7 +63,7 @@ class Enemy:
             if e.uid != self.uid and 0.01 < d.length() < self.radius + e.radius + 4:
                 separation = separation + d.normalized() * 0.5
         desired = (desired + separation).normalized()
-        speed = 112 if self.kind == "wolf" else 83
+        speed = 112 if self.kind == "wolf" else 83 if self.kind == "boar" else 94
         proposed, _ = arena.move(self.pos, desired * (speed * dt), self.radius)
         if proposed.distance(self.pos) < speed * dt * 0.2 and delta.length() > 45:
             # 초기의 단순한 장애물에 대한 국소 우회. 고급 길 찾기는 사용하지 않는다.
@@ -63,7 +75,7 @@ class Enemy:
         self.pos = proposed
 
     def receive_slash(self):
-        damage = 2 if self.kind == "boar" and self.state in ("charge", "recover") else 1
+        damage = 2 if self.kind in ("boar", "sentinel") and self.state in ("charge", "recover") else 1
         self.hp -= damage
         self.flash = 0.14
         return True

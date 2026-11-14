@@ -5,6 +5,8 @@ from geometry import Arena, Vec, path_hits
 from player import Player
 from afterimage import Trail, Slash
 from enemy import Enemy
+from device import Device
+from projectile import Projectile
 
 
 class Combat:
@@ -14,6 +16,8 @@ class Combat:
         self.trail = None
         self.slashes = []
         self.enemies = []
+        self.devices = []
+        self.projectiles = []
         self.events = []
         self.elapsed = 0.0
         self.kills = 0
@@ -33,6 +37,12 @@ class Combat:
         e = Enemy.make(self.uid, kind, pos)
         self.enemies.append(e)
         return e
+
+    def spawn_device(self, kind, pos, link=""):
+        self.uid += 1
+        device = Device.make(self.uid, kind, pos, link)
+        self.devices.append(device)
+        return device
 
     def dash(self):
         if not self.ready:
@@ -62,11 +72,29 @@ class Combat:
                 continue
             if enemy.receive_slash():
                 hits += 1
-                weak = weak or enemy.kind == "guardian"
+                weak = weak or enemy.kind in ("guardian", "knight", "dragon")
                 self.events.append(("hit", enemy.pos))
                 if enemy.hp <= 0:
                     dead += 1
                     self.events.append(("kill", enemy.pos))
+        # 연결 단자는 같은 참격 경로에 두 개가 함께 놓여야 반응한다.
+        touched = [d for d in self.devices if path_hits(slash.points, d.pos, slash.radius + d.radius)]
+        links = {d.link for d in touched if d.link and sum(other.link == d.link for other in touched) >= 2}
+        for device in touched:
+            if device.link and device.link not in links:
+                continue
+            device.receive_slash()
+            hits += 1
+            self.events.append(("hit", device.pos))
+            if device.hp <= 0:
+                dead += 1
+                self.events.append(("kill", device.pos))
+        self.devices = [d for d in self.devices if d.hp > 0]
+        removed = [b for b in self.projectiles if path_hits(slash.points, b.pos, slash.radius + b.radius)]
+        if removed:
+            self.projectiles = [b for b in self.projectiles if b not in removed]
+            hits += len(removed)
+            self.events.extend(("hit", b.pos) for b in removed)
         self.kills += dead
         self.last_hits = hits
         self.max_hits = max(self.max_hits, hits)
@@ -105,6 +133,13 @@ class Combat:
                     self.events.append(("expire", p.pos))
         for enemy in self.enemies:
             enemy.update(dt, p, self.arena, self.enemies)
+            if getattr(enemy, "projectile_request", False):
+                direction = enemy.direction.normalized()
+                self.projectiles.append(Projectile(enemy.pos + direction * (enemy.radius + 12), direction * 240))
+                enemy.projectile_request = False
+        self.projectiles = [b for b in self.projectiles if b.update(dt, self.arena)]
+        for device in self.devices:
+            device.flash = max(0, device.flash - dt)
         for slash in self.slashes:
             slash.age += dt
             if not slash.resolved and slash.age >= C.SLASH_HIT_TIME:
@@ -116,3 +151,10 @@ class Combat:
                 self.events.append(("hurt", p.pos))
                 knock = (p.pos - enemy.pos).normalized() * 35
                 p.pos, _ = self.arena.move(p.pos, knock, p.radius)
+            if getattr(enemy, "kind", "") == "dragon" and enemy.threatens(p.pos) and p.hurt():
+                self.events.append(("hurt", p.pos))
+        for bullet in self.projectiles[:]:
+            if p.pos.distance(bullet.pos) < p.radius + bullet.radius:
+                if p.hurt():
+                    self.events.append(("hurt", p.pos))
+                self.projectiles.remove(bullet)
