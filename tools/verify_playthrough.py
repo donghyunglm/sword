@@ -115,7 +115,10 @@ def run(start=0):
                     hit = any(path_hits(c.trail.points, e.pos, player.slash_radius + e.radius) for e in c.enemies)
                     if hit or c.trail.remaining < 0.12:
                         c.slash()
-                direction = (delta.normalized() if distance > 125 else delta.normalized() * -1) if target.kind == "mage" else (delta.normalized() if distance > 205 else delta.normalized() * -1)
+                direction = ((delta.normalized() if distance > 125 else delta.normalized() * -1)
+                             if target.kind == "mage" else
+                             (delta.normalized() if distance > (95 if c.defend_pos is not None else 205)
+                              else delta.normalized() * -1))
                 if target.state in ("tell", "charge") and distance < 240:
                     direction = Vec(-target.direction.y, target.direction.x)
             threats = []
@@ -143,7 +146,10 @@ def run(start=0):
         game.update(1 / 120, direction)
         c.events.clear()
     print("PLAYTHROUGH INCOMPLETE:", game.stage["id"], game.mode, "HP", game.combat.player.hp,
-          "kills", game.combat.kills, "seconds", round(game.combat.elapsed, 1))
+          "kills", game.combat.kills, "seconds", round(game.combat.elapsed, 1),
+          "pos", game.combat.player.pos, "devices", [(d.kind, d.pos) for d in game.combat.devices],
+          "enemies", [(e.kind, e.pos) for e in game.combat.enemies],
+          "ready", game.combat.ready, "trail", len(game.combat.trail.points) if game.combat.trail else 0)
     return False
 
 

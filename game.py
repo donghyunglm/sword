@@ -7,6 +7,7 @@ from boss import Guardian
 from late_bosses import Knight, Dragon
 from stage import load_stages, make_arena
 from save_data import read_save, write_save, DEFAULT_PATH
+from projectile import Projectile
 
 
 class Game:
@@ -32,6 +33,13 @@ class Game:
         self.hazard_timer = 3.5
         self.hazard_marker = None
         self.hazard_active = 0
+        self.production_timer = 4.0
+        self.production_counts = {}
+        self.beacon_pos = Vec(560, 390)
+        self.beacon_hp = 0
+        self.beacon_timer = 1.0
+        self.remote_timer = 2.4
+        self.remote_shots = 0
 
     @property
     def stage(self):
@@ -58,10 +66,17 @@ class Game:
     def load_stage(self, index, upgrades=None, hp=C.MAX_HP, persist=True):
         self.index = index
         stage = self.stage
+        self.goal = stage["goal"] - (sum(kind == "wolf" for _, wave in stage["waves"] for kind, _, _ in wave)
+                                     if index == 8 and 7 in self.cleared else 0)
         player = Player(pos=Vec(*stage["start"]), hp=hp)
         if upgrades:
             player.upgrades = dict(upgrades)
-        self.combat = Combat(make_arena(stage), player, dual_mode=index == 14)
+        self.combat = Combat(make_arena(stage), player,
+                             purification=index >= 5, seal_break=index >= 10)
+        self.combat.defend_pos = self.beacon_pos if index == 1 else None
+        self.beacon_hp = 8 if index == 1 else 0
+        self.beacon_timer = 1.0
+        self.remote_timer, self.remote_shots = 2.4, 0
         self.mode, self.paused = "play", False
         self.wave_index = 0
         self.gate_open = False
@@ -69,6 +84,7 @@ class Game:
         self.banner_left = 2.8
         self.toast, self.toast_left = "", 0
         self.hazard_timer, self.hazard_marker, self.hazard_active = 3.5, None, 0
+        self.production_timer, self.production_counts = 4.0, {}
         for device in stage.get("devices", []):
             kind, x, y = device[:3]
             self.combat.spawn_device(kind, Vec(x, y), device[3] if len(device) > 3 else "")
@@ -76,7 +92,17 @@ class Game:
             self.combat.uid += 1
             boss_type = {True: Guardian, "knight": Knight, "dragon": Dragon}[stage["boss"]]
             self.combat.enemies.append(boss_type(self.combat.uid, Vec(560, 490)))
+            if index == 14:
+                # 성역의 공급 결정을 파괴한 결과가 최종 보스 체력에 남는다.
+                destroyed = sum(i in self.cleared for i in (10, 12, 13))
+                boss = self.combat.enemies[-1]
+                boss.max_hp = max(12, boss.max_hp - destroyed * 2)
+                boss.hp = boss.max_hp
         self.round_start = copy.deepcopy(self.snapshot())
+        if index == 8 and 7 in self.cleared:
+            self.tell("생산 결정을 파괴해 요새의 늑대 증원이 끊겼습니다.", 4)
+        elif index == 14 and destroyed:
+            self.tell(f"성역의 공급선 {destroyed}개를 끊어 드래곤의 체력이 약해졌습니다.", 4)
         if persist:
             self.persist()
 
@@ -181,7 +207,29 @@ class Game:
             return
         self.toast_left = max(0, self.toast_left - dt)
         self.banner_left = max(0, self.banner_left - dt)
+        if self.index == 12:
+            self.remote_timer -= dt
+            if self.remote_timer <= 0:
+                self.remote_timer = 3.0
+                origin = Vec(210 if self.remote_shots % 2 == 0 else 910, 605)
+                velocity = (self.combat.player.pos - origin).normalized() * 310
+                self.combat.projectiles.append(Projectile(origin, velocity, kind="dragon", radius=15))
+                self.combat.events.append(("boss_breath", origin))
+                self.remote_shots += 1
         self.combat.update(dt, movement)
+        if self.index == 1:
+            if any(e.kind == "wolf" and e.pos.distance(self.beacon_pos) < 43 for e in self.combat.enemies):
+                self.beacon_timer -= dt
+                if self.beacon_timer <= 0:
+                    self.beacon_hp -= 1
+                    self.beacon_timer = 0.9
+                    self.combat.events.append(("beacon_hit", self.beacon_pos))
+                    if self.beacon_hp <= 0:
+                        self.mode = "defeat"
+                        self.tell("이정표가 파괴되었습니다. 다시 도전하세요.", 4)
+                        return
+            else:
+                self.beacon_timer = 1.0
         if self.stage.get("hazards"):
             self.hazard_timer -= dt
             if self.hazard_marker is None and self.hazard_timer <= 0:
@@ -208,11 +256,27 @@ class Game:
         waves = self.stage["waves"]
         while self.wave_index < len(waves) and self.combat.elapsed >= waves[self.wave_index][0]:
             for kind, x, y in waves[self.wave_index][1]:
+                # 생산지를 정화했다면 다음 통로의 요새 병력이 일부 사라진다.
+                if self.index == 8 and 7 in self.cleared and kind == "wolf":
+                    continue
                 self.combat.spawn(kind, Vec(x, y))
             self.wave_index += 1
+        if self.index == 7 and self.combat.devices:
+            self.production_timer -= dt
+            if self.production_timer <= 0:
+                self.production_timer = 5.0
+                for crystal in self.combat.devices:
+                    if crystal.kind != "crystal" or self.production_counts.get(crystal.uid, 0) >= 2:
+                        continue
+                    kind = "wolf" if crystal.pos.x < 400 else "mage" if crystal.pos.x < 700 else "sentinel"
+                    spawn_pos = Vec(crystal.pos.x, crystal.pos.y - 75)
+                    if self.combat.arena.valid(spawn_pos, 20):
+                        self.combat.spawn(kind, spawn_pos)
+                        self.production_counts[crystal.uid] = self.production_counts.get(crystal.uid, 0) + 1
+                        self.combat.events.append(("production", crystal.pos))
         if (not self.gate_open and self.wave_index == len(waves)
                 and not self.combat.enemies and not self.combat.devices
-                and self.combat.kills >= self.stage["goal"]):
+                and self.combat.kills >= self.goal):
             self.gate_open = True
             self.tell("봉인 해제! 위쪽 빛의 문으로 이동하세요.", 4)
             self.combat.events.append(("open", Vec(560, 606)))

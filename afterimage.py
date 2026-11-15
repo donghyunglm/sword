@@ -30,8 +30,7 @@ class Trail:
             self.points.append(self.last)
 
     def visible_points(self):
-        n = len(self.points)
-        return [self.points[i] for i in sorted({round(i * (n - 1) / 3) for i in range(4)})]
+        return self.points[::2] + ([self.points[-1]] if len(self.points) % 2 == 0 else [])
 
 
 @dataclass
@@ -43,7 +42,16 @@ class Slash:
     age: float = 0
     resolved: bool = False
     style: str = "trail"
+    next_point: int = 0
+    hit_ids: object = None
+    pending_links: object = None
+    boss_hits: object = None
+
+    def __post_init__(self):
+        self.hit_ids = set() if self.hit_ids is None else self.hit_ids
+        self.pending_links = set() if self.pending_links is None else self.pending_links
+        self.boss_hits = {} if self.boss_hits is None else self.boss_hits
 
     @property
     def alive(self):
-        return self.age < 0.27
+        return self.age < (0.20 + len(self.points) * 0.045 if self.style == "chain" else 0.27)

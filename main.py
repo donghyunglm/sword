@@ -40,7 +40,7 @@ def prepare_scene(game, name):
         game.selected_stage = 14
         return
     game.training = False
-    scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9,
+    scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9, "chain": 0, "beacon": 1,
                     "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14,
                     "dragon-attack": 14}
     game.load_stage(scene_stages.get(name, 0), persist=False)
@@ -54,9 +54,25 @@ def prepare_scene(game, name):
         game.combat.spawn("wolf", Vec(500, 375))
         game.combat.spawn("wolf", Vec(560, 390))
         game.combat.spawn("boar", Vec(800, 450))
+    if name == "chain":
+        from afterimage import Trail
+        game.combat.player.pos = Vec(760, 340)
+        game.combat.player.facing = Vec(1, 0)
+        game.combat.trail = Trail(Vec(330, 340), Vec(1, 0), 1.2)
+        game.combat.trail.record(Vec(760, 340))
+        game.combat.trail.finish()
+        game.combat.spawn("wolf", Vec(430, 370))
+        game.combat.spawn("wolf", Vec(560, 370))
+        game.combat.spawn("wolf", Vec(690, 370))
+        game.combat.slash()
+        for _ in range(22):
+            game.combat.update(1 / 120)
     if name == "fortress":
         game.combat.spawn("mage", Vec(360, 470))
         game.combat.spawn("sentinel", Vec(770, 470))
+    if name == "beacon":
+        game.combat.spawn("wolf", Vec(470, 455))
+        game.combat.spawn("wolf", Vec(650, 455))
     if name == "dragon-attack":
         dragon = game.combat.enemies[0]
         dragon.attack, dragon.state, dragon.timer = "breath", "attack", 0.3
@@ -72,8 +88,10 @@ def prepare_scene(game, name):
         dragon.state, dragon.timer = "weak", 1.0
         game.combat.player.pos = Vec(620, 410)
         game.combat.player.facing = Vec(0, 1)
-        game.combat.echo_pos = Vec(500, 410)
-        game.combat.echo_remaining = game.combat.player.trail_lifetime
+        from afterimage import Trail
+        game.combat.trail = Trail(Vec(500, 410), Vec(1, 0), 1.2)
+        game.combat.trail.record(Vec(620, 410))
+        game.combat.trail.finish()
         game.combat.slash()
     if name in ("upgrade", "defeat", "victory"):
         game.mode = name
@@ -83,7 +101,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="잔영의 검 / Python + pico2d")
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
-    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight",
+    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon",
                                             "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack",
                                             "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)

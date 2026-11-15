@@ -2,6 +2,7 @@ import unittest
 from geometry import Arena, Rect, Vec
 from combat import Combat
 from afterimage import Trail
+from boss import Guardian
 
 
 class CombatTests(unittest.TestCase):
@@ -34,7 +35,7 @@ class CombatTests(unittest.TestCase):
             c.spawn("wolf", Vec(x, 280))
         self.assertTrue(c.slash())
         self.assertFalse(c.dash())
-        self.tick(c, 0.08)
+        self.tick(c, 0.6)
         self.assertEqual(c.last_hits, 2)
         self.assertEqual(c.kills, 2)
         self.assertTrue(c.ready)
@@ -47,9 +48,9 @@ class CombatTests(unittest.TestCase):
         self.tick(c, 0.2)
         c.spawn("boar", Vec(560, 280))
         c.slash()
-        self.tick(c, 0.07)
+        self.tick(c, 0.6)
         self.assertEqual(c.last_hits, 1)
-        self.assertGreater(c.player.cooldown, 0.45)
+        self.assertGreater(c.player.cooldown, 0)
         self.assertEqual(c.enemies[0].hp, 1)
         self.assertFalse(c.ready)
 
@@ -75,6 +76,50 @@ class CombatTests(unittest.TestCase):
         for i in range(1, 191):
             b.record(Vec(i, 0))
         self.assertEqual(a.points, b.points)
+
+    def test_chain_strikes_in_order_and_each_enemy_once(self):
+        c = Combat()
+        c.player.facing = Vec(1, 0)
+        self.assertTrue(c.dash())
+        self.tick(c, 0.2)
+        c.spawn("wolf", Vec(575, 180))
+        c.spawn("wolf", Vec(740, 180))
+        self.assertTrue(c.slash())
+        self.tick(c, 0.09)
+        self.assertEqual(c.kills, 1)
+        self.tick(c, 0.55)
+        self.assertEqual(c.kills, 2)
+        self.assertEqual(c.last_hits, 2)
+
+    def test_direct_sword_is_available_without_dash(self):
+        c = Combat()
+        c.spawn("wolf", Vec(560, 235))
+        self.assertTrue(c.slash())
+        self.tick(c, 0.08)
+        self.assertEqual(c.kills, 1)
+
+    def test_chain_boss_hits_are_sequential_and_capped(self):
+        c = Combat()
+        c.player.facing = Vec(1, 0)
+        c.dash()
+        self.tick(c, 0.2)
+        boss = Guardian(1, Vec(655, 180), state="weak", timer=2)
+        c.enemies = [boss]
+        c.slash()
+        self.tick(c, 0.16)
+        first_damage = boss.max_hp - boss.hp
+        self.tick(c, 0.5)
+        self.assertGreater(boss.max_hp - boss.hp, first_damage)
+        self.assertLessEqual(boss.max_hp - boss.hp, 4)
+
+    def test_seal_break_destroys_crystal_in_one_strike(self):
+        c = Combat(seal_break=True)
+        c.player.pos = Vec(500, 340)
+        c.player.facing = Vec(0, 1)
+        c.spawn_device("crystal", Vec(500, 400))
+        c.slash()
+        self.tick(c, 0.08)
+        self.assertFalse(c.devices)
 
 
 if __name__ == "__main__":

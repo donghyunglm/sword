@@ -38,13 +38,13 @@ class DualStrikeTests(unittest.TestCase):
         self.assertIsNone(combat.echo_pos)
         self.assertEqual(len(combat.slashes[0].points), 2)
 
-    def test_only_dragon_round_uses_experimental_controls(self):
+    def test_dragon_round_uses_campaign_controls(self):
         with tempfile.TemporaryDirectory() as directory:
             game = Game(Path(directory) / "save.json")
             game.load_stage(13, persist=False)
             self.assertFalse(game.combat.dual_mode)
             game.load_stage(14, persist=False)
-            self.assertTrue(game.combat.dual_mode)
+            self.assertFalse(game.combat.dual_mode)
 
     def test_two_swords_hit_one_boss_only_once(self):
         combat = Combat(dual_mode=True)

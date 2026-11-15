@@ -61,7 +61,7 @@ class Renderer:
     def consume(self, events):
         for kind, pos in events:
             if kind in ("hit", "kill", "hurt", "recharge", "open", "crystal_break", "terminal_on",
-                        "boss_impact", "boss_breath", "boss_hit"):
+                        "boss_impact", "boss_breath", "boss_hit", "production", "beacon_hit"):
                 self.effects.append([kind, pos, 0.0])
             if kind == "hurt":
                 self.shake = 0.18
@@ -191,6 +191,10 @@ class Renderer:
 
     def scene(self, game):
         combat = game.combat
+        if game.index == 1 and game.beacon_hp > 0:
+            self.bank.draw_cell("terminal", 1, 0, game.beacon_pos, 78, 82)
+            rect(game.beacon_pos.x - 40, game.beacon_pos.y + 47, 80, 8, INK)
+            rect(game.beacon_pos.x - 38, game.beacon_pos.y + 49, 76 * game.beacon_hp / 8, 4, CYAN)
         if game.hazard_marker is not None:
             color = RED if game.hazard_active else GOLD
             circle(game.hazard_marker, 78, color, 105 if game.hazard_active else 190)
@@ -206,8 +210,9 @@ class Renderer:
                 self.text(device.link, device.pos.x - 5, device.pos.y - 8, 16, color)
         for bullet in combat.projectiles:
             row = 1 if bullet.kind == "knight" else 0
-            frame = int(self.visual_time * 10) % 4
-            if not self.bank.draw_cell("projectiles", frame, row, bullet.pos, 34, 34):
+            frame = 2 if bullet.kind == "dragon" else int(self.visual_time * 10) % 4
+            size = 46 if bullet.kind == "dragon" else 34
+            if not self.bank.draw_cell("projectiles", frame, row, bullet.pos, size, size):
                 circle(bullet.pos, bullet.radius, WHITE, 230, True)
         if combat.dual_mode and combat.echo_pos is not None:
             alpha = int(70 + 100 * combat.echo_remaining / combat.player.trail_lifetime)
@@ -217,10 +222,11 @@ class Renderer:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
             for a, b in zip(trail.points, trail.points[1:]):
-                line(a, b, CYAN, alpha)
-            for pos in trail.visible_points():
-                circle(pos, combat.player.slash_radius, CYAN, 35)
-                self.actor("player", pos, trail.direction, ghost=True, alpha=alpha)
+                line(a, b, CYAN, alpha // 2)
+            visible = trail.visible_points()
+            for i, pos in enumerate(visible):
+                fade = int(alpha * (0.3 + 0.7 * (i + 1) / len(visible)))
+                self.actor("player", pos, trail.direction, ghost=True, alpha=fade)
         for enemy in combat.enemies:
             if enemy.state == "tell" and enemy.kind != "dragon":
                 color = RED if enemy.kind == "guardian" else GOLD
@@ -286,6 +292,19 @@ class Renderer:
             if self.debug:
                 circle(actor.pos, actor.radius, GOLD if is_player else RED, 200)
         for slash in combat.slashes:
+            if slash.style == "chain":
+                for i in range(slash.next_point, len(slash.points)):
+                    pos = slash.points[i]
+                    strength = (i + 1) / len(slash.points)
+                    self.actor("player", pos, slash.direction, ghost=True, alpha=int(65 + 95 * strength))
+                if slash.next_point:
+                    index = min(slash.next_point - 1, len(slash.points) - 1)
+                    pos = slash.points[index]
+                    phase = max(0, slash.age - (C.SLASH_HIT_TIME + index * 0.045))
+                    if phase < 0.13:
+                        self.arc(pos, slash.radius + 10, slash.direction, phase, GOLD)
+                        self.bank.draw_cell("combat_fx", 0, 0, pos, 80, 80, 1 - phase / 0.13)
+                continue
             n = len(slash.points)
             indices = (range(n) if slash.style == "dual" else
                        sorted({round(k * (n - 1) / 3) for k in range(4)}))
@@ -298,7 +317,7 @@ class Renderer:
                 self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
                                     max(0, 1 - slash.age / 0.27))
         for kind, pos, age in self.effects:
-            color = RED if kind == "hurt" else GOLD if kind == "recharge" else CYAN
+            color = RED if kind in ("hurt", "production", "beacon_hit") else GOLD if kind == "recharge" else CYAN
             alpha = int(max(0, 1 - age / 0.7) * 240)
             if kind == "crystal_break" and self.bank.draw_cell("crystal", 2, 0, pos, 72, 72, alpha / 255):
                 continue
@@ -311,6 +330,8 @@ class Renderer:
                 circle(pos, size, GOLD if kind == "boss_hit" else RED, alpha)
                 circle(pos, size * 0.7, GOLD if kind == "boss_hit" else VIOLET, alpha // 2)
                 self.bank.draw_cell("combat_fx", 1, 0, pos, 120, 120, alpha / 255)
+            if kind in ("production", "beacon_hit"):
+                circle(pos, 30 + age * 70, VIOLET, alpha)
             for i in range(6):
                 q = pos + Vec(math.cos(i * 1.8), math.sin(i * 1.8)) * (age * 80 + 5)
                 rect(q.x, q.y, 4, 4, color, alpha)
@@ -340,11 +361,13 @@ class Renderer:
             status = "DASH READY" if c.ready else "DASHING" if player.dash_left else "J : 참격" if c.trail else "참격 중" if any(not s.resolved for s in c.slashes) else f"충전 {player.cooldown:.1f}s"
         self.text(status, 215, 695, 20, CYAN if c.ready else GOLD)
         if not c.dual_mode:
-            self.text(f"최대 동시 적중 {c.max_hits}", 450, 695, 18, MUTED)
-        goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.stage['goal'])} / {game.stage['goal']}"
+            self.text(f"최대 연속 적중 {c.max_hits}", 450, 695, 18, MUTED)
+        goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.goal)} / {game.goal}"
         self.text(goal, 720, 731, 20, GOLD)
+        if game.index == 1 and game.mode == "play":
+            self.text(f"이정표 {game.beacon_hp}/8", 870, 666, 18, CYAN if game.beacon_hp > 3 else RED)
         rect(722, 688, 308, 8, (42, 49, 59))
-        ratio = 0 if game.training else min(1, c.kills / game.stage["goal"])
+        ratio = 0 if game.training else min(1, c.kills / game.goal)
         rect(722, 688, 308 * ratio, 8, CYAN)
         if c.trail:
             self.text(f"잔영 {c.trail.remaining:.1f}초", 450, 731, 18, CYAN)
@@ -352,6 +375,10 @@ class Renderer:
             self.text(f"잔영 {c.echo_remaining:.1f}초", 610, 695, 18, CYAN)
         if c.prism:
             self.text("PRISM / 다음 참격 확대", 720, 667, 16, GOLD)
+        elif game.index >= 10:
+            self.text("정화의 검 · 봉인 파쇄", 720, 667, 16, GOLD)
+        elif game.index >= 5:
+            self.text("정화의 검", 720, 667, 16, GOLD)
         bosses = [e for e in c.enemies if e.kind in ("guardian", "knight", "dragon")]
         if bosses:
             boss = bosses[0]
@@ -361,8 +388,7 @@ class Renderer:
             state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! J 참격", "recover": "회복", "approach": "대기"}[boss.state]
             self.text(label + "  /  " + state, 360, 583, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, INK)
-        controls = ("WASD / 방향키  이동     J  직접 검격     Space  잔영 대시"
-                    if c.dual_mode else "WASD / 방향키  이동     Space  대시     J  잔영 참격")
+        controls = "WASD / 방향키  이동     J  직접 검격 / 잔영 연속 참격     Space  대시"
         self.text(controls, 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
         if game.toast_left > 0:
@@ -417,8 +443,11 @@ class Renderer:
             self.center("전투·잔영·보스의 시간은 모두 멈춰 있습니다.", 255, 18, MUTED)
         elif game.mode == "upgrade":
             self.shade()
+            reward = ("정화의 검 획득 · 결정과 탄환을 벨 수 있습니다" if game.index == 4 else
+                      "봉인 파쇄 획득 · 성역의 결정을 한 번에 깹니다" if game.index == 9 else
+                      "검에 남은 빛으로 한 가지 힘을 회복하세요")
             self.center("봉인이 풀렸다", 554, 42, CYAN)
-            self.center("검에 남은 빛으로 한 가지 힘을 회복하세요", 496, 23, WHITE)
+            self.center(reward, 496, 23, WHITE)
             names = [("참격 범위", "경로 주변 공격 반경 +7px"),
                      ("잔영 유지", "발동을 기다리는 시간 +0.2초"),
                      ("이동 속도", "일반 이동 속도 +9%")]
@@ -444,7 +473,7 @@ class Renderer:
             self.center("세 봉인 해제", 497, 42, CYAN)
             self.center("드래곤의 침식을 정화했습니다", 429, 26, WHITE)
             self.center("15라운드 모험 완료", 369, 23, GOLD)
-            self.center(f"최대 동시 적중  {max(game.records['hits'], game.combat.max_hits)}", 310, 20, MUTED)
+            self.center(f"최대 연속 적중  {max(game.records['hits'], game.combat.max_hits)}", 310, 20, MUTED)
             self.center("숲에서 배운 잔영 검술로 성역의 재앙을 끝냈습니다.", 244, 18, MUTED)
             self.center("Enter / Q   타이틀로", 172, 23, CYAN)
 

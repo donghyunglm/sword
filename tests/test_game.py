@@ -137,6 +137,60 @@ class GameTests(unittest.TestCase):
         self.assertTrue(g.continue_game())
         self.assertEqual(g.stage["id"], "1-1")
 
+    def test_campaign_actions_change_later_fights(self):
+        g = self.game
+        g.cleared = [7, 10, 12, 13]
+        g.load_stage(8, persist=False)
+        self.assertLess(g.goal, g.stage["goal"])
+        g.load_stage(14, persist=False)
+        dragon = g.combat.enemies[0]
+        self.assertEqual(dragon.max_hp, 14)
+
+    def test_boss_rewards_change_combat_rules(self):
+        g = self.game
+        g.load_stage(3, persist=False)
+        self.assertFalse(g.combat.purification)
+        g.load_stage(5, persist=False)
+        self.assertTrue(g.combat.purification)
+        self.assertFalse(g.combat.seal_break)
+        g.load_stage(10, persist=False)
+        self.assertTrue(g.combat.seal_break)
+
+    def test_fortress_crystals_spawn_only_while_intact(self):
+        g = self.game
+        g.load_stage(7, persist=False)
+        g.update(1 / 120)
+        g.wave_index = len(g.stage["waves"])
+        g.combat.enemies.clear()
+        g.update(4.1)
+        self.assertEqual({e.kind for e in g.combat.enemies}, {"wolf", "mage", "sentinel"})
+        g.combat.devices = [d for d in g.combat.devices if d.pos.x != 240]
+        g.combat.enemies.clear()
+        g.update(5.1)
+        self.assertNotIn("wolf", {e.kind for e in g.combat.enemies})
+
+    def test_signpost_can_be_lost_and_retried(self):
+        g = self.game
+        g.load_stage(1, persist=False)
+        for _ in range(14 * 120):
+            g.update(1 / 120)
+            if g.mode == "defeat":
+                break
+        self.assertEqual(g.mode, "defeat")
+        g.retry()
+        self.assertEqual(g.beacon_hp, 8)
+
+    def test_sanctuary_fireball_travels_across_arena(self):
+        g = self.game
+        g.load_stage(12, persist=False)
+        for _ in range(290):
+            g.update(1 / 120)
+        fireballs = [b for b in g.combat.projectiles if b.kind == "dragon"]
+        self.assertTrue(fireballs)
+        start = fireballs[0].pos
+        g.update(0.1)
+        self.assertGreater(fireballs[0].pos.distance(start), 20)
+
 
 if __name__ == "__main__":
     unittest.main()

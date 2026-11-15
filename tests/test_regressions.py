@@ -16,8 +16,8 @@ class RegressionTests(unittest.TestCase):
         boss = Guardian(1, Vec(560, 280), state="weak", timer=1)
         c.enemies = [boss]
         c.slash()
-        self.advance(c, 0.08)
-        self.assertEqual(boss.hp, 14)
+        self.advance(c, 0.6)
+        self.assertEqual(boss.hp, 12)
         self.assertTrue(c.ready)
 
     def test_boss_armor_does_not_count_as_success(self):
@@ -27,7 +27,7 @@ class RegressionTests(unittest.TestCase):
         boss = Guardian(1, Vec(560, 280), timer=1)
         c.enemies = [boss]
         c.slash()
-        self.advance(c, 0.08)
+        self.advance(c, 0.6)
         self.assertEqual(boss.hp, 16)
         self.assertEqual(c.last_hits, 0)
         self.assertFalse(c.ready)
@@ -39,7 +39,7 @@ class RegressionTests(unittest.TestCase):
         for x in (530, 560, 590):
             c.spawn("wolf", Vec(x, 280))
         c.slash()
-        self.advance(c, 0.08)
+        self.advance(c, 0.6)
         self.assertTrue(c.prism)
         c.dash()
         self.advance(c, 0.2)
@@ -83,8 +83,8 @@ class RegressionTests(unittest.TestCase):
         self.assertEqual(boss.state, "weak")
         self.assertIsNotNone(c.trail)
         self.assertTrue(c.slash())
-        self.advance(c, 0.08)
-        self.assertEqual(boss.hp, 14)
+        self.advance(c, 0.6)
+        self.assertEqual(boss.hp, 12)
         self.assertEqual(c.player.hp, 6)
         self.assertTrue(c.ready)
 

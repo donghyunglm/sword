@@ -19,7 +19,7 @@ class Device:
         return cls(uid, kind, pos, 2 if kind == "crystal" else 1,
                    27 if kind == "crystal" else 21, link)
 
-    def receive_slash(self):
-        self.hp -= 1
+    def receive_slash(self, damage=1):
+        self.hp -= damage
         self.flash = 0.2
         return True
