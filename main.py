@@ -36,7 +36,9 @@ def prepare_scene(game, name):
     if name == "title":
         return
     game.training = False
-    game.load_stage(4 if name == "boss" else 0, persist=False)
+    scene_stages = {"boss": 4, "fortress": 5, "knight": 9,
+                    "sanctuary": 10, "dragon": 14}
+    game.load_stage(scene_stages.get(name, 0), persist=False)
     if name == "play":
         game.combat.player.pos = Vec(660, 315)
         game.combat.player.facing = Vec(1, 0)
@@ -55,7 +57,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="잔영의 검 / Python + pico2d")
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
-    parser.add_argument("--scene", choices=("title", "play", "boss", "upgrade", "defeat", "victory"), default="play")
+    parser.add_argument("--scene", choices=("title", "play", "boss", "fortress", "knight",
+                                            "sanctuary", "dragon", "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--mute", action="store_true")

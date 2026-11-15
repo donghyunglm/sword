@@ -1,1 +1,42 @@
-{}
+{
+  "player": {
+    "file": "images/hero.png", "frame_width": 64, "frame_height": 64,
+    "frames": 6, "draw_width": 80, "draw_height": 80, "offset_y": 8,
+    "direction_order": ["down", "left", "right", "up"],
+    "animations": {
+      "idle": {"row": 0, "frames": 4, "fps": 6},
+      "walk": {"row": 4, "frames": 6, "fps": 10},
+      "dash": {"row": 8, "frames": 4, "fps": 18},
+      "slash": {"row": 12, "frames": 5, "fps": 12}
+    }
+  },
+  "wolf": {
+    "file": "images/wolf.png", "frame_width": 48, "frame_height": 48,
+    "frames": 4, "draw_width": 58, "draw_height": 58, "offset_y": 6,
+    "animations": {"chase": {"row": 0, "frames": 4, "fps": 8}}
+  },
+  "boar": {
+    "file": "images/boar.png", "frame_width": 64, "frame_height": 64,
+    "frames": 4, "draw_width": 72, "draw_height": 72, "offset_y": 8,
+    "animations": {
+      "chase": {"row": 0, "frames": 4, "fps": 8},
+      "tell": {"row": 4, "frames": 2, "fps": 5},
+      "charge": {"row": 8, "frames": 3, "fps": 14},
+      "recover": {"row": 12, "frames": 3, "fps": 7}
+    }
+  },
+  "guardian": {
+    "file": "images/guardian.png", "frame_width": 96, "frame_height": 96,
+    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 12,
+    "animations": {
+      "approach": {"row": 0, "frames": 4, "fps": 7},
+      "tell": {"row": 4, "frames": 3, "fps": 5},
+      "charge": {"row": 8, "frames": 4, "fps": 14},
+      "weak": {"row": 12, "frames": 4, "fps": 8},
+      "recover": {"row": 16, "frames": 3, "fps": 6}
+    }
+  },
+  "forest": {"file": "images/forest.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
+  "fortress": {"file": "images/fortress.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
+  "sanctuary": {"file": "images/sanctuary.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0}
+}

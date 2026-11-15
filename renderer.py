@@ -16,23 +16,6 @@ GOLD = (246, 204, 116)
 VIOLET = (183, 128, 216)
 RED = (234, 108, 112)
 
-HERO = (
-    "....hhhhh.....", "...hhhhhhh....", "..hhhwwhhhh...", "..hhwwwwwhh...",
-    "...hsssssh....", "...seseess....", "....sssss.....", "..tttttttttt..",
-    "..ttaaaatt....", "...aaaaaaa....", "..saaAAaas....", "..saaAAaas....",
-    "...aaaaaa.....", "...dddddd.....", "...dd..dd.....", "..bbb..bbb....")
-WOLF = (
-    "..v......v...", "..vv....vv...", "..vkvvvvkv...", "...vvvvvv....",
-    "..vvrvvrvv...", "..vvvvvvvv...", "...vvvvvv....", "....vvvv.....",
-    "...vvvvvv....", "..vvvvvvvv...", "..kkvvvvkk...", "....vvvv.....",
-    "...kk..kk....")
-BOAR = (
-    "...aa..aa....", "..aaaaaaaa...", ".aaappppaaa..", "aaappppppaaa.",
-    "aaappppppaaa.", "aaappppppaaa.", "aaappppppaaa.", ".aaaaaaaaaa..",
-    "..arAAAra....", "..aaAAAaa....", "..wAAAAAw....", "..wAAAAAw....",
-    "...AAAAA.....", "...kk.kk.....")
-
-
 def rect(x, y, w, h, color, alpha=255, filled=True):
     p.draw_rectangle(int(x), int(y), int(x + w), int(y + h), *color, alpha, filled)
 
@@ -61,11 +44,6 @@ class Renderer:
         self.visual_time = 0
         rng = random.Random(41)
         self.grass = [(rng.randint(55, 1064), rng.randint(119, 613), rng.randrange(3)) for _ in range(180)]
-        self.palette = {"h": (167, 184, 200), "w": (222, 237, 241), "s": (227, 192, 155),
-                        "e": (24, 39, 54), "t": (63, 202, 182), "a": (49, 73, 99),
-                        "A": (122, 145, 152), "d": (40, 46, 66), "b": (25, 32, 43),
-                        "v": (103, 62, 132), "k": (43, 32, 57), "r": (232, 108, 144),
-                        "p": (174, 104, 169)}
 
     def text(self, message, x, y, size=20, color=WHITE):
         self.fonts[size].draw(x, y, str(message), color)
@@ -93,21 +71,6 @@ class Renderer:
             item[2] += dt
         self.effects = [e for e in self.effects if e[2] < 0.7]
 
-    def pixel(self, pattern, pos, scale=3, ghost=False, alpha=255, flash=False, bob=0):
-        width, height = len(pattern[0]), len(pattern)
-        ox, oy = pos.x - width * scale / 2, pos.y + height * scale / 2 + 6 + bob
-        for row, contents in enumerate(pattern):
-            col = 0
-            while col < len(contents):
-                char = contents[col]
-                end = col + 1
-                while end < len(contents) and contents[end] == char:
-                    end += 1
-                if char != ".":
-                    color = WHITE if flash else CYAN if ghost else self.palette.get(char, WHITE)
-                    rect(ox + col * scale, oy - (row + 1) * scale, (end - col) * scale, scale, color, alpha)
-                col = end
-
     def actor(self, kind, pos, direction, state="idle", ghost=False, alpha=255, flash=False):
         scale = 2 if kind in ("guardian", "knight", "dragon") else 1
         if not ghost:
@@ -129,6 +92,9 @@ class Renderer:
             for sign in (-1, 1):
                 ear = center - direction * (7 * scale) + side * (sign * 10 * scale)
                 circle(ear, 5 * scale, color, alpha, True)
+            for sign in (-1, 1):
+                eye = center + direction * (9 * scale) + side * (sign * 5 * scale)
+                circle(eye, 2 * scale, RED if kind == "dragon" else GOLD, alpha, True)
         if kind in ("mage", "knight"):
             circle(center, 18 * scale, GOLD if state == "weak" else color, 80, False)
         if kind == "dragon":
@@ -136,6 +102,9 @@ class Renderer:
                 wing = center + side * (sign * 27 * scale)
                 circle(wing, 12 * scale, color, alpha // 2, True)
         if kind == "player":
+            cape = center - direction * 11
+            line(cape - side * 10, cape - direction * 18, CYAN if ghost else (49, 88, 129), alpha)
+            line(cape + side * 10, cape - direction * 18, CYAN if ghost else (49, 88, 129), alpha)
             grip = center + side * 12
             line(grip, grip + direction * (31 if state == "slash" else 23), CYAN if ghost else WHITE, alpha)
             circle(center + direction * 7, 5, GOLD, alpha, True)
@@ -146,7 +115,8 @@ class Renderer:
         base = {"forest": (25, 48, 45), "fortress": (42, 43, 60),
                 "sanctuary": (40, 38, 60)}[theme]
         rect(30, 98, 1060, 536, base)
-        if not self.bank.draw(theme, Vec(560, 366), 0, scale=1):
+        has_background = self.bank.draw(theme, Vec(560, 366), 0, scale=1)
+        if not has_background:
             for x, y, tone in self.grass:
                 if theme == "forest":
                     circle(Vec(x, y), 2 + tone, (49, 89, 69), 90, True)
@@ -156,14 +126,27 @@ class Renderer:
                 for y in (153, 555):
                     circle(Vec(x, y), 18 if theme == "forest" else 10,
                            (45, 84, 67) if theme == "forest" else (73, 72, 92), 120, True)
-        for x in range(42, 1080, 65):
-            for y in (105, 626):
-                circle(Vec(x, y), 15 if theme == "forest" else 9,
-                       (39, 76, 59) if theme == "forest" else (93, 89, 111), 200, True)
+            if theme == "fortress":
+                for x in (130, 990):
+                    for y in (270, 440):
+                        circle(Vec(x, y), 29, (91, 89, 111), 150)
+                        circle(Vec(x, y), 18, (110, 103, 125), 80, True)
+            elif theme == "sanctuary":
+                for x, y in ((180, 260), (940, 260), (180, 500), (940, 500)):
+                    circle(Vec(x, y), 36, VIOLET, 80)
+                    circle(Vec(x, y), 25, CYAN, 55)
+            for x in range(42, 1080, 65):
+                for y in (105, 626):
+                    circle(Vec(x, y), 15 if theme == "forest" else 9,
+                           (39, 76, 59) if theme == "forest" else (93, 89, 111), 200, True)
         for wall in game.combat.arena.walls:
-            rect(wall.x - 3, wall.y - 5, wall.w + 6, wall.h + 7, INK)
-            rect(wall.x, wall.y, wall.w, wall.h, (61, 77, 79) if theme == "forest" else (81, 79, 101))
-            rect(wall.x + 3, wall.y + wall.h - 9, wall.w - 6, 7, MUTED, 55)
+            if has_background:
+                rect(wall.x, wall.y, wall.w, wall.h, VIOLET, 48)
+                rect(wall.x, wall.y, wall.w, wall.h, CYAN, 140, False)
+            else:
+                rect(wall.x - 3, wall.y - 5, wall.w + 6, wall.h + 7, INK)
+                rect(wall.x, wall.y, wall.w, wall.h, (61, 77, 79) if theme == "forest" else (81, 79, 101))
+                rect(wall.x + 3, wall.y + wall.h - 9, wall.w - 6, 7, MUTED, 55)
         gate_color = CYAN if game.gate_open else VIOLET
         rect(510, 588, 100, 40, (12, 23, 32))
         rect(508, 586, 9, 44, gate_color)
@@ -305,11 +288,11 @@ class Renderer:
         bosses = [e for e in c.enemies if e.kind in ("guardian", "knight", "dragon")]
         if bosses:
             boss = bosses[0]
-            rect(300, 591, 520, 13, (30, 20, 37))
-            rect(300, 591, 520 * boss.hp / boss.max_hp, 13, VIOLET)
+            rect(300, 562, 520, 13, (30, 20, 37))
+            rect(300, 562, 520 * boss.hp / boss.max_hp, 13, VIOLET)
             label = {"guardian": "숲의 수호수", "knight": "봉인 수호기사", "dragon": "침식된 드래곤"}[boss.kind]
             state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! J 참격", "recover": "회복", "approach": "대기"}[boss.state]
-            self.text(label + "  /  " + state, 360, 616, 18, GOLD if boss.state == "weak" else WHITE)
+            self.text(label + "  /  " + state, 360, 583, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, INK)
         self.text("WASD / 방향키  이동     Space  대시     J  잔영 참격", 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
