@@ -13,7 +13,9 @@ class Audio:
         directory = Path(__file__).resolve().parent / ".cache" / "sounds"
         tones = {"dash": (520, 220, 0.08), "slash": (850, 190, 0.10),
                  "hit": (240, 80, 0.07), "hurt": (130, 60, 0.18),
-                 "recharge": (540, 1100, 0.16), "open": (440, 880, 0.35)}
+                 "recharge": (540, 1100, 0.16), "open": (440, 880, 0.35),
+                 "boss_impact": (110, 42, 0.24), "boss_breath": (180, 80, 0.32),
+                 "boss_hit": (360, 95, 0.2)}
         if not enabled:
             return
         try:

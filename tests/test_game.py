@@ -119,6 +119,24 @@ class GameTests(unittest.TestCase):
         g.choose_upgrade(0)
         self.assertEqual(g.combat.player.hp, 6)
 
+    def test_trial_stage_selection_preserves_existing_save(self):
+        g = self.game
+        g.new_game()
+        original = self.path.read_bytes()
+        g.exit_to_title()
+        g.open_trial_select()
+        self.assertEqual(g.mode, "select")
+        self.assertTrue(g.start_trial(14))
+        self.assertEqual(g.stage["id"], "3-5")
+        self.assertEqual(sum(g.combat.player.upgrades.values()), 9)
+        g.gate_open = True
+        g.enter_gate()
+        self.assertEqual(g.mode, "victory")
+        self.assertEqual(self.path.read_bytes(), original)
+        g.exit_to_title()
+        self.assertTrue(g.continue_game())
+        self.assertEqual(g.stage["id"], "1-1")
+
 
 if __name__ == "__main__":
     unittest.main()

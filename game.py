@@ -19,6 +19,8 @@ class Game:
         self.index = 0
         self.cleared = []
         self.training = False
+        self.trial = False
+        self.selected_stage = 0
         self.paused = False
         self.wave_index = 0
         self.gate_open = False
@@ -44,7 +46,7 @@ class Game:
                 "upgrades": dict(p.upgrades), "cleared": list(self.cleared)}
 
     def persist(self, phase="play"):
-        if self.training:
+        if self.training or self.trial:
             return
         data = self.snapshot(phase)
         try:
@@ -79,7 +81,7 @@ class Game:
             self.persist()
 
     def new_game(self):
-        self.training, self.cleared = False, []
+        self.training, self.trial, self.cleared = False, False, []
         self.records = {"kills": 0, "hits": 0, "time": 0.0}
         self.load_stage(0)
 
@@ -87,7 +89,7 @@ class Game:
         if not self.saved:
             return False
         data = copy.deepcopy(self.saved)
-        self.training, self.cleared = False, data["cleared"]
+        self.training, self.trial, self.cleared = False, False, data["cleared"]
         self.load_stage(data["stage"], data["upgrades"], data["hp"], persist=False)
         self.mode = data["phase"]
         self.gate_open = self.mode != "play"
@@ -99,7 +101,7 @@ class Game:
         return True
 
     def start_training(self):
-        self.training, self.cleared = True, []
+        self.training, self.trial, self.cleared = True, False, []
         self.load_stage(0, persist=False)
         self.combat.enemies = []
         self.combat.spawn("wolf", Vec(520, 350))
@@ -107,6 +109,23 @@ class Game:
         self.combat.spawn("wolf", Vec(600, 350))
         self.combat.spawn("boar", Vec(800, 490))
         self.tell("연습장: 처치한 적이 다시 나타납니다. 저장 기록에는 영향을 주지 않습니다.", 5)
+
+    def open_trial_select(self):
+        if self.mode == "title":
+            self.selected_stage = 0
+            self.mode = "select"
+
+    def start_trial(self, index):
+        if self.mode != "select" or not 0 <= index < len(self.stages):
+            return False
+        self.training, self.trial = False, True
+        self.cleared = list(range(index))
+        levels = {key: 0 for key in C.UPGRADES}
+        for i in range(min(index, C.UPGRADE_LIMIT * len(C.UPGRADES))):
+            levels[C.UPGRADES[i % len(C.UPGRADES)]] += 1
+        self.load_stage(index, levels, persist=False)
+        self.tell("라운드 체험 중 · 기존 저장은 유지됩니다.", 3)
+        return True
 
     def retry(self):
         if self.training:
@@ -119,6 +138,7 @@ class Game:
 
     def exit_to_title(self):
         self.mode, self.paused = "title", False
+        self.trial = False
         self.combat = Combat()
         self.saved, self.notice = read_save(self.save_path)
 

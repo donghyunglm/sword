@@ -27,6 +27,9 @@ class Guardian:
             self.direction = (player.pos - self.pos).normalized()
             if self.pos.distance(player.pos) > 220:
                 self.pos, _ = arena.move(self.pos, self.direction * (68 * dt), self.radius)
+            else:
+                side = Vec(-self.direction.y, self.direction.x) * (1 if self.cycles % 2 else -1)
+                self.pos, _ = arena.move(self.pos, side * (42 * dt), self.radius)
             if self.timer <= 0:
                 self.direction = (player.pos - self.pos).normalized()
                 self.charge_distance = min(290, self.pos.distance(player.pos) + 20)

@@ -41,6 +41,51 @@ class LateCampaignTests(unittest.TestCase):
             self.assertFalse(boss.receive_slash())
             self.assertEqual(boss.hp, boss.max_hp - 2)
 
+    def test_dragon_moves_to_stomp_marker_then_exposes_weakness(self):
+        from geometry import Arena
+        from player import Player
+        dragon = Dragon(1, Vec(560, 490))
+        player = Player(pos=Vec(560, 300))
+        arena = Arena()
+        for _ in range(260):
+            dragon.update(1 / 120, player, arena)
+            if dragon.state == "weak":
+                break
+        self.assertEqual(dragon.state, "weak")
+        self.assertLess(dragon.pos.y, 490)
+        self.assertGreaterEqual(dragon.pos.y, 370)
+
+    def test_breath_damage_follows_visible_growth(self):
+        from geometry import Arena
+        from player import Player
+        dragon = Dragon(1, Vec(560, 490), state="tell", timer=0.01,
+                        attack="breath", direction=Vec(0, -1))
+        player = Player(pos=Vec(560, 180))
+        dragon.update(0.02, player, Arena())
+        self.assertEqual(dragon.state, "attack")
+        self.assertFalse(dragon.threatens(Vec(560, 400)))
+        dragon.update(0.1, player, Arena())
+        self.assertTrue(dragon.threatens(Vec(560, 400)))
+        self.assertFalse(dragon.threatens(Vec(560, 300)))
+        dragon.update(0.1, player, Arena())
+        self.assertTrue(dragon.threatens(Vec(560, 300)))
+
+    def test_stomp_damages_only_on_landing(self):
+        from geometry import Arena
+        from player import Player
+        marker = Vec(560, 400)
+        dragon = Dragon(1, Vec(560, 490), state="tell", timer=0.01,
+                        attack="stomp", marker=marker, direction=Vec(0, -1),
+                        stomp_remaining=90)
+        player = Player(pos=marker)
+        dragon.update(0.02, player, Arena())
+        dragon.update(0.1, player, Arena())
+        self.assertEqual(dragon.state, "attack")
+        self.assertFalse(dragon.threatens(marker))
+        dragon.update(0.1, player, Arena())
+        self.assertEqual(dragon.state, "weak")
+        self.assertTrue(dragon.threatens(marker))
+
     def test_checkpoint_in_sanctuary_and_full_upgrade_skip(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "save.json"

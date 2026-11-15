@@ -41,6 +41,8 @@ class Renderer:
         self.debug = False
         self.audio_enabled = True
         self.shake = 0.0
+        self.impact_flash = 0.0
+        self.animation_starts = {}
         self.visual_time = 0
         rng = random.Random(41)
         self.grass = [(rng.randint(55, 1064), rng.randint(119, 613), rng.randrange(3)) for _ in range(180)]
@@ -58,26 +60,34 @@ class Renderer:
 
     def consume(self, events):
         for kind, pos in events:
-            if kind in ("hit", "kill", "hurt", "recharge", "open", "crystal_break", "terminal_on"):
+            if kind in ("hit", "kill", "hurt", "recharge", "open", "crystal_break", "terminal_on",
+                        "boss_impact", "boss_breath", "boss_hit"):
                 self.effects.append([kind, pos, 0.0])
             if kind == "hurt":
                 self.shake = 0.18
+            if kind in ("boss_impact", "boss_breath", "boss_hit"):
+                self.impact_flash = 0.13 if kind != "boss_hit" else 0.08
         events.clear()
 
     def tick(self, dt):
         self.visual_time += dt
         self.shake = max(0, self.shake - dt)
+        self.impact_flash = max(0, self.impact_flash - dt)
         for item in self.effects:
             item[2] += dt
         self.effects = [e for e in self.effects if e[2] < 0.7]
 
-    def actor(self, kind, pos, direction, state="idle", ghost=False, alpha=255, flash=False):
+    def actor(self, kind, pos, direction, state="idle", ghost=False, alpha=255, flash=False,
+              animation_time=None):
         scale = 2 if kind in ("guardian", "knight", "dragon") else 1
         if not ghost:
             circle(pos + Vec(0, -9), 19 * scale, INK, 110, True)
         if kind == "dragon" and state in ("tell", "attack"):
-            state = f"{self.dragon_attack}_{state}"
-        if self.bank.draw("player" if ghost else kind, pos, self.visual_time, direction, state,
+            state = ("breath_tell" if self.dragon_attack == "breath" and state == "attack"
+                     and self.dragon_reach < 160 else f"{self.dragon_attack}_{state}")
+        if self.bank.draw("player" if ghost else kind, pos,
+                          self.visual_time if animation_time is None else animation_time,
+                          direction, state,
                           alpha / 255, scale):
             return
         direction = direction.normalized() if direction.length() else Vec(0, -1)
@@ -222,13 +232,33 @@ class Renderer:
             if enemy.kind == "dragon" and enemy.state in ("tell", "attack"):
                 color = RED if enemy.state == "attack" else GOLD
                 if enemy.attack == "stomp":
-                    circle(enemy.marker, 90, color, 180)
+                    radius = 90 * (0.7 + 0.3 * (enemy.timer / 0.9)) if enemy.state == "tell" else 90
+                    circle(enemy.marker, radius, color, 200)
                     circle(enemy.marker, 90, color, 35, True)
                 else:
                     side = Vec(-enemy.direction.y, enemy.direction.x) * 56
-                    end = enemy.pos + enemy.direction * 440
+                    bounds = combat.arena.bounds
+                    reach = 440.0
+                    if enemy.direction.x > 0:
+                        reach = min(reach, (bounds.x + bounds.w - enemy.pos.x) / enemy.direction.x)
+                    elif enemy.direction.x < 0:
+                        reach = min(reach, (bounds.x - enemy.pos.x) / enemy.direction.x)
+                    if enemy.direction.y > 0:
+                        reach = min(reach, (bounds.y + bounds.h - enemy.pos.y) / enemy.direction.y)
+                    elif enemy.direction.y < 0:
+                        reach = min(reach, (bounds.y - enemy.pos.y) / enemy.direction.y)
+                    reach = max(0, reach)
+                    visible_reach = min(reach, enemy.breath_reach) if enemy.state == "attack" else reach
+                    end = enemy.pos + enemy.direction * visible_reach
                     line(enemy.pos - side, end - side, color, 180)
                     line(enemy.pos + side, end + side, color, 180)
+                    if enemy.state == "tell":
+                        circle(enemy.pos + enemy.direction * 30,
+                               12 + 12 * (1 - enemy.timer / 0.9), VIOLET, 150, True)
+                    if enemy.state == "attack" and visible_reach > 0:
+                        center = enemy.pos + enemy.direction * (visible_reach / 2)
+                        angle = math.atan2(enemy.direction.y, enemy.direction.x)
+                        self.bank.draw_rotated_cell("combat_fx", 3, 0, center, visible_reach, 105, angle, 0.85)
             if enemy.state == "charge":
                 line(enemy.pos - enemy.direction * 40, enemy.pos, GOLD, 120)
         actors = [(e.pos.y, e) for e in combat.enemies]
@@ -247,8 +277,19 @@ class Renderer:
                     state = "cast"
                 if kind == "dragon":
                     self.dragon_attack = actor.attack
+                    self.dragon_reach = actor.breath_reach
+            facing = (("right" if direction.x > 0 else "left") if abs(direction.x) > abs(direction.y)
+                      else ("up" if direction.y > 0 else "down"))
+            actor_key = (game.index, 0 if is_player else actor.uid)
+            phase = ("breath_charge" if kind == "dragon" and state == "attack"
+                     and actor.breath_reach < 160 else state)
+            token = (phase, facing)
+            if actor_key not in self.animation_starts or self.animation_starts[actor_key][0] != token:
+                self.animation_starts[actor_key] = (token, self.visual_time)
+            animation_time = self.visual_time - self.animation_starts[actor_key][1]
             self.actor(kind, actor.pos, direction, state, alpha=alpha,
-                       flash=not is_player and actor.flash > 0)
+                       flash=not is_player and actor.flash > 0,
+                       animation_time=animation_time)
             if not is_player and actor.kind in ("boar", "sentinel") and actor.hp == 1:
                 rect(actor.pos.x - 11, actor.pos.y + 37, 22, 3, RED)
             if self.debug:
@@ -273,6 +314,11 @@ class Renderer:
                 continue
             if kind in ("hit", "kill"):
                 self.bank.draw_cell("combat_fx", 1, 0, pos, 68, 68, alpha / 255)
+            if kind in ("boss_impact", "boss_breath", "boss_hit"):
+                size = (75 + age * 270) if kind != "boss_hit" else (70 + age * 110)
+                circle(pos, size, GOLD if kind == "boss_hit" else RED, alpha)
+                circle(pos, size * 0.7, GOLD if kind == "boss_hit" else VIOLET, alpha // 2)
+                self.bank.draw_cell("combat_fx", 1, 0, pos, 120, 120, alpha / 255)
             for i in range(6):
                 q = pos + Vec(math.cos(i * 1.8), math.sin(i * 1.8)) * (age * 80 + 5)
                 rect(q.x, q.y, 4, 4, color, alpha)
@@ -286,7 +332,10 @@ class Renderer:
         c, player = game.combat, game.combat.player
         rect(0, 660, C.WIDTH, 100, INK)
         self.text("잔영의 검", 32, 730, 26, WHITE)
-        self.text("TRAINING" if game.training else f"{game.stage['id']}  {game.stage['title']}", 215, 731, 23, CYAN)
+        label = "TRAINING" if game.training else f"{game.stage['id']}  {game.stage['title']}"
+        self.text(label, 215, 731, 23, CYAN)
+        if game.trial:
+            self.text("체험", 650, 731, 18, GOLD)
         for i in range(C.MAX_HP):
             color = RED if i < player.hp else (48, 57, 62)
             rect(34 + i * 25, 685, 18, 16, color)
@@ -294,7 +343,7 @@ class Renderer:
         status = "DASH READY" if c.ready else "DASHING" if player.dash_left else "J : 참격" if c.trail else "참격 중" if any(not s.resolved for s in c.slashes) else f"충전 {player.cooldown:.1f}s"
         self.text(status, 215, 695, 20, CYAN if c.ready else GOLD)
         self.text(f"최대 동시 적중 {c.max_hits}", 450, 695, 18, MUTED)
-        goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.stage['goal'])} / {game.stage['goal']} 처치"
+        goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.stage['goal'])} / {game.stage['goal']}"
         self.text(goal, 720, 731, 20, GOLD)
         rect(722, 688, 308, 8, (42, 49, 59))
         ratio = 0 if game.training else min(1, c.kills / game.stage["goal"])
@@ -314,7 +363,6 @@ class Renderer:
         rect(0, 0, C.WIDTH, 78, INK)
         self.text("WASD / 방향키  이동     Space  대시     J  잔영 참격", 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
-        self.text("임시 2D 그래픽 / 교체 가능", 850, 25, 14, MUTED)
         if game.toast_left > 0:
             rect(160, 120, 800, 43, INK, 230)
             self.center(game.toast, 143, 18, GOLD)
@@ -338,7 +386,8 @@ class Renderer:
         self.text("Enter   새 모험", 94, 310, 26, WHITE)
         self.text("C          이어하기" + ("" if game.saved else "  (기록 없음)"), 94, 262, 23, CYAN if game.saved else MUTED)
         self.text("T          잔영 검술 연습장", 94, 215, 23, GOLD)
-        self.text("숲·요새·성역 15라운드 / 수호기사·드래곤 / 선택 강화", 92, 145, 18, MUTED)
+        self.text("F2         라운드 체험 (저장 유지)", 94, 178, 20, CYAN)
+        self.text("숲·요새·성역 15라운드 / 수호기사·드래곤 / 선택 강화", 92, 137, 18, MUTED)
         if game.saved:
             self.text("새 모험은 기존 진행을 새로 시작합니다.", 92, 109, 16, RED)
         if game.notice:
@@ -348,6 +397,16 @@ class Renderer:
         if game.mode == "title":
             self.shade()
             self.title(game)
+        elif game.mode == "select":
+            self.shade()
+            self.center("라운드 체험", 600, 42, CYAN)
+            self.center("위·아래 방향키로 선택 / Enter 시작 / Esc 돌아가기", 558, 18, MUTED)
+            for i, stage in enumerate(game.stages):
+                y = 525 - i * 29
+                color = GOLD if i == game.selected_stage else WHITE
+                self.text(("▶ " if i == game.selected_stage else "   ") + stage["id"] + "  " + stage["title"],
+                          370, y, 18, color)
+            self.center("라운드 체험은 기존 진행 저장을 변경하지 않습니다.", 65, 16, CYAN)
         elif game.paused:
             self.shade()
             self.center("잠시 숨 고르기", 470, 42)
@@ -389,8 +448,11 @@ class Renderer:
 
     def draw(self, game):
         self.floor(game)
-        if game.mode != "title":
+        if game.mode not in ("title", "select"):
             self.scene(game)
+            if self.impact_flash > 0:
+                rect(30, 98, 1060, 536, WHITE if self.impact_flash < 0.08 else RED,
+                     int(80 * self.impact_flash / 0.13))
             self.hud(game)
         self.menu(game)
 

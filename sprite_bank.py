@@ -92,3 +92,15 @@ class SpriteBank:
                         pos.x, pos.y, width, height)
         image.opacify(1)
         return True
+
+    def draw_rotated_cell(self, name, column, row, pos, width, height, angle, alpha=1):
+        if name not in self.entries:
+            return False
+        image, _, fw, fh, _ = self.entries[name]
+        if column < 0 or row < 0 or (column + 1) * fw > image.w or (row + 1) * fh > image.h:
+            return False
+        image.opacify(alpha)
+        image.clip_composite_draw(column * fw, image.h - (row + 1) * fh, fw, fh,
+                                  angle, "", pos.x, pos.y, width, height)
+        image.opacify(1)
+        return True

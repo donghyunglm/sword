@@ -35,9 +35,13 @@ def prepare_scene(game, name):
     """스모크 테스트 전용 장면. 사용자의 진행 저장을 건드리지 않는다."""
     if name == "title":
         return
+    if name == "select":
+        game.open_trial_select()
+        game.selected_stage = 14
+        return
     game.training = False
     scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9,
-                    "sanctuary": 10, "dragon": 14}
+                    "sanctuary": 10, "dragon": 14, "dragon-attack": 14}
     game.load_stage(scene_stages.get(name, 0), persist=False)
     if name == "play":
         game.combat.player.pos = Vec(660, 315)
@@ -52,6 +56,12 @@ def prepare_scene(game, name):
     if name == "fortress":
         game.combat.spawn("mage", Vec(360, 470))
         game.combat.spawn("sentinel", Vec(770, 470))
+    if name == "dragon-attack":
+        dragon = game.combat.enemies[0]
+        dragon.attack, dragon.state, dragon.timer = "breath", "attack", 0.3
+        dragon.direction = Vec(0, -1)
+        dragon.breath_reach = 210
+        game.combat.events.append(("boss_breath", dragon.pos))
     if name in ("upgrade", "defeat", "victory"):
         game.mode = name
 
@@ -60,8 +70,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="잔영의 검 / Python + pico2d")
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
-    parser.add_argument("--scene", choices=("title", "play", "boss", "fortress", "devices", "knight",
-                                            "sanctuary", "dragon", "upgrade", "defeat", "victory"), default="play")
+    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight",
+                                            "sanctuary", "dragon", "dragon-attack", "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--mute", action="store_true")
@@ -130,8 +140,19 @@ def main(argv=None):
                             game.continue_game()
                         elif key == pico.SDLK_t:
                             game.start_training()
+                        elif key == pico.SDLK_F2:
+                            game.open_trial_select()
                         elif key == pico.SDLK_ESCAPE:
                             running = False
+                    elif game.mode == "select":
+                        if key in (pico.SDLK_UP, pico.SDLK_w):
+                            game.selected_stage = (game.selected_stage - 1) % len(game.stages)
+                        elif key in (pico.SDLK_DOWN, pico.SDLK_s):
+                            game.selected_stage = (game.selected_stage + 1) % len(game.stages)
+                        elif key == pico.SDLK_RETURN:
+                            game.start_trial(game.selected_stage)
+                        elif key == pico.SDLK_ESCAPE:
+                            game.exit_to_title()
                     elif game.mode == "play":
                         if key == pico.SDLK_ESCAPE:
                             game.paused = not game.paused

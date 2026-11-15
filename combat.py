@@ -72,8 +72,9 @@ class Combat:
                 continue
             if enemy.receive_slash():
                 hits += 1
-                weak = weak or enemy.kind in ("guardian", "knight", "dragon")
-                self.events.append(("hit", enemy.pos))
+                boss_target = enemy.kind in ("guardian", "knight", "dragon")
+                weak = weak or boss_target
+                self.events.append(("boss_hit" if boss_target else "hit", enemy.pos))
                 if enemy.hp <= 0:
                     dead += 1
                     self.events.append(("kill", enemy.pos))
@@ -132,7 +133,15 @@ class Combat:
                     p.cooldown = C.MISS_COOLDOWN
                     self.events.append(("expire", p.pos))
         for enemy in self.enemies:
+            previous_state = enemy.state
             enemy.update(dt, p, self.arena, self.enemies)
+            if enemy.kind in ("guardian", "knight", "dragon") and enemy.state != previous_state:
+                if enemy.kind == "dragon" and enemy.state == "attack" and enemy.attack == "breath":
+                    self.events.append(("boss_breath", enemy.pos))
+                elif enemy.kind == "dragon" and previous_state == "attack" and enemy.attack == "stomp":
+                    self.events.append(("boss_impact", enemy.marker))
+                elif previous_state == "charge" and enemy.state == "weak":
+                    self.events.append(("boss_impact", enemy.pos))
             if getattr(enemy, "projectile_request", False):
                 direction = enemy.direction.normalized()
                 self.projectiles.append(Projectile(enemy.pos + direction * (enemy.radius + 12), direction * 240,
