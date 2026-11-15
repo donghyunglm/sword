@@ -58,7 +58,7 @@ class Renderer:
 
     def consume(self, events):
         for kind, pos in events:
-            if kind in ("hit", "kill", "hurt", "recharge", "open"):
+            if kind in ("hit", "kill", "hurt", "recharge", "open", "crystal_break", "terminal_on"):
                 self.effects.append([kind, pos, 0.0])
             if kind == "hurt":
                 self.shake = 0.18
@@ -75,6 +75,8 @@ class Renderer:
         scale = 2 if kind in ("guardian", "knight", "dragon") else 1
         if not ghost:
             circle(pos + Vec(0, -9), 19 * scale, INK, 110, True)
+        if kind == "dragon" and state in ("tell", "attack"):
+            state = f"{self.dragon_attack}_{state}"
         if self.bank.draw("player" if ghost else kind, pos, self.visual_time, direction, state,
                           alpha / 255, scale):
             return
@@ -148,14 +150,16 @@ class Renderer:
                 rect(wall.x, wall.y, wall.w, wall.h, (61, 77, 79) if theme == "forest" else (81, 79, 101))
                 rect(wall.x + 3, wall.y + wall.h - 9, wall.w - 6, 7, MUTED, 55)
         gate_color = CYAN if game.gate_open else VIOLET
-        rect(510, 588, 100, 40, (12, 23, 32))
-        rect(508, 586, 9, 44, gate_color)
-        rect(603, 586, 9, 44, gate_color)
-        if game.gate_open:
-            rect(520, 590, 80, 36, CYAN, 35 + int(20 * (1 + math.sin(self.visual_time * 4))))
-        else:
-            for x in range(526, 602, 15):
-                line(Vec(x, 591), Vec(x, 624), VIOLET, 160)
+        if not self.bank.draw_cell("door", 2 if game.gate_open else 0, 0,
+                                   Vec(560, 600), 120, 89):
+            rect(510, 588, 100, 40, (12, 23, 32))
+            rect(508, 586, 9, 44, gate_color)
+            rect(603, 586, 9, 44, gate_color)
+            if game.gate_open:
+                rect(520, 590, 80, 36, CYAN, 55)
+            else:
+                for x in range(526, 602, 15):
+                    line(Vec(x, 591), Vec(x, 624), VIOLET, 160)
         seal = Vec(560, 365)
         circle(seal, 43, gate_color, 75)
         circle(seal, 34, gate_color, 75)
@@ -180,21 +184,21 @@ class Renderer:
         if game.hazard_marker is not None:
             color = RED if game.hazard_active else GOLD
             circle(game.hazard_marker, 78, color, 105 if game.hazard_active else 190)
-            circle(game.hazard_marker, 70, color, 45, True)
+            if not self.bank.draw_cell("combat_fx", 2, 0, game.hazard_marker, 156, 156, 0.6):
+                circle(game.hazard_marker, 70, color, 45, True)
         for device in combat.devices:
             color = WHITE if device.flash else GOLD if device.kind == "terminal" else VIOLET
-            circle(device.pos, device.radius + 7, color, 90)
-            circle(device.pos, device.radius, color, 180, True)
-            circle(device.pos, device.radius - 9, INK, 220, True)
-            if device.kind == "crystal":
-                circle(device.pos, 7, color, 220, True)
-                if device.hp > 1:
-                    circle(device.pos, device.radius + 11, color, 180)
-            else:
+            name = "crystal" if device.kind == "crystal" else "terminal"
+            frame = 1 if device.flash else 0
+            if not self.bank.draw_cell(name, frame, 0, device.pos, 67, 67):
+                circle(device.pos, device.radius, color, 180, True)
+            if device.kind == "terminal":
                 self.text(device.link, device.pos.x - 5, device.pos.y - 8, 16, color)
         for bullet in combat.projectiles:
-            circle(bullet.pos, bullet.radius + 5, VIOLET, 85, True)
-            circle(bullet.pos, bullet.radius, WHITE, 230, True)
+            row = 1 if bullet.kind == "knight" else 0
+            frame = int(self.visual_time * 10) % 4
+            if not self.bank.draw_cell("projectiles", frame, row, bullet.pos, 34, 34):
+                circle(bullet.pos, bullet.radius, WHITE, 230, True)
         if combat.trail:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
@@ -239,6 +243,10 @@ class Renderer:
                 alpha = 125 if actor.invulnerable > 0 and int(self.visual_time * 14) % 2 else 255
             else:
                 state, direction, alpha = actor.state, actor.direction, 255
+                if kind == "mage" and actor.cast_left > 0:
+                    state = "cast"
+                if kind == "dragon":
+                    self.dragon_attack = actor.attack
             self.actor(kind, actor.pos, direction, state, alpha=alpha,
                        flash=not is_player and actor.flash > 0)
             if not is_player and actor.kind in ("boar", "sentinel") and actor.hp == 1:
@@ -247,14 +255,24 @@ class Renderer:
                 circle(actor.pos, actor.radius, GOLD if is_player else RED, 200)
         for slash in combat.slashes:
             n = len(slash.points)
-            for i in sorted({round(k * (n - 1) / 3) for k in range(4)}):
+            indices = sorted({round(k * (n - 1) / 3) for k in range(4)})
+            for i in indices:
                 pos = slash.points[i]
                 alpha = int(190 * max(0, 1 - slash.age / 0.27))
                 self.actor("player", pos, slash.direction, ghost=True, alpha=alpha)
                 self.arc(pos, slash.radius, slash.direction, slash.age, GOLD if slash.boosted else CYAN)
+            center = slash.points[n // 2]
+            self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
+                                max(0, 1 - slash.age / 0.27))
         for kind, pos, age in self.effects:
             color = RED if kind == "hurt" else GOLD if kind == "recharge" else CYAN
             alpha = int(max(0, 1 - age / 0.7) * 240)
+            if kind == "crystal_break" and self.bank.draw_cell("crystal", 2, 0, pos, 72, 72, alpha / 255):
+                continue
+            if kind == "terminal_on" and self.bank.draw_cell("terminal", 2, 0, pos, 72, 72, alpha / 255):
+                continue
+            if kind in ("hit", "kill"):
+                self.bank.draw_cell("combat_fx", 1, 0, pos, 68, 68, alpha / 255)
             for i in range(6):
                 q = pos + Vec(math.cos(i * 1.8), math.sin(i * 1.8)) * (age * 80 + 5)
                 rect(q.x, q.y, 4, 4, color, alpha)

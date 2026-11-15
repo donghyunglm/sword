@@ -1,9 +1,9 @@
 # 최종 스프라이트 교체
 
-현재 제공받은 검사·늑대·멧돼지·숲의 수호수 시트와 지역 배경 3장을 사용한다. 아직 없는 후반 캐릭터는 임시 2D 도형으로 표시한다.
+현재 제공받은 검사·적 4종·지역 보스 3종 시트와 지역 배경 3장을 사용한다. 결정·단자·봉인의 문·탄환·전투 효과도 PNG를 사용한다. 없는 상태나 효과는 임시 도형으로 표시할 수 있다.
 
 새 이미지가 준비되면 `assets/images`에 넣고 `assets/sprites.json`에 설정한다.
-`sprites.example.json`은 **구조를 보여주는 예시**다. 현재 적용된 설정은 `sprites.json`에 있다.
+`sprites.example.json`은 **구조를 보여주는 예시**다. 현재 적용된 설정과 원본 시트의 프레임 배치는 `sprites.json`에 있다.
 
 ## 한 장짜리 PNG
 
@@ -78,7 +78,7 @@
 
 `row`는 이미지 위에서부터 0이며, 상태의 **아래 방향 첫 행**이다. `animations`의 각 상태는 서로 다른 프레임 수와 속도를 쓸 수 있다. 이미지가 아직 없으면 기존 `assets/sprites.json`의 빈 설정을 유지한다.
 
-사용할 수 있는 항목은 `player`, `wolf`, `boar`, `guardian`, `mage`, `sentinel`, `knight`, `dragon`, `forest`, `fortress`, `sanctuary`다.
+사용할 수 있는 항목은 `player`, `wolf`, `boar`, `guardian`, `mage`, `sentinel`, `knight`, `dragon`, `crystal`, `terminal`, `door`, `projectiles`, `combat_fx`, `forest`, `fortress`, `sanctuary`다.
 guardian, knight, dragon은 기본 캐릭터보다 2배 크기로 표시하므로 예시의 `draw_width` 42는 실제 84px로 표시된다.
 설정하지 않은 항목은 임시 2D 도형을 계속 사용한다.
 

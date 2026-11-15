@@ -36,6 +36,53 @@
       "recover": {"row": 16, "frames": 3, "fps": 6}
     }
   },
+  "mage": {
+    "file": "images/mage.png", "frame_width": 64, "frame_height": 64,
+    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 8,
+    "animations": {
+      "chase": {"row": 0, "frames": 4, "fps": 8},
+      "cast": {"row": 4, "frames": 4, "fps": 12}
+    }
+  },
+  "sentinel": {
+    "file": "images/sentinel.png", "frame_width": 64, "frame_height": 64,
+    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 8,
+    "animations": {
+      "chase": {"row": 0, "frames": 4, "fps": 8},
+      "tell": {"row": 4, "frames": 2, "fps": 5},
+      "charge": {"row": 8, "frames": 3, "fps": 14},
+      "recover": {"row": 12, "frames": 3, "fps": 7}
+    }
+  },
+  "knight": {
+    "file": "images/knight.png", "frame_width": 96, "frame_height": 96,
+    "frames": 4, "draw_width": 65, "draw_height": 65, "offset_y": 11,
+    "animations": {
+      "approach": {"row": 0, "frames": 4, "fps": 7},
+      "tell": {"row": 4, "frames": 3, "fps": 6},
+      "charge": {"row": 8, "frames": 4, "fps": 14},
+      "weak": {"row": 16, "frames": 4, "fps": 8},
+      "recover": {"row": 20, "frames": 3, "fps": 6}
+    }
+  },
+  "dragon": {
+    "file": "images/dragon.png", "frame_width": 192, "frame_height": 192,
+    "frames": 4, "draw_width": 105, "draw_height": 105, "offset_y": 16,
+    "animations": {
+      "approach": {"row": 0, "frames": 4, "fps": 5, "directions": false},
+      "stomp_tell": {"row": 1, "frames": 3, "fps": 5, "directions": false},
+      "stomp_attack": {"row": 2, "frames": 4, "fps": 12, "directions": false},
+      "breath_tell": {"row": 3, "frames": 3, "fps": 5, "directions": false},
+      "breath_attack": {"row": 4, "frames": 4, "fps": 12, "directions": false},
+      "weak": {"row": 5, "frames": 4, "fps": 8, "directions": false},
+      "recover": {"row": 6, "frames": 3, "fps": 6, "directions": false}
+    }
+  },
+  "crystal": {"file": "images/crystal.png", "frame_width": 64, "frame_height": 64, "frames": 3},
+  "terminal": {"file": "images/terminal.png", "frame_width": 64, "frame_height": 64, "frames": 3},
+  "door": {"file": "images/door.png", "frame_width": 128, "frame_height": 96, "frames": 3},
+  "projectiles": {"file": "images/projectiles.png", "frame_width": 64, "frame_height": 64, "frames": 4},
+  "combat_fx": {"file": "images/combat_fx.png", "frame_width": 128, "frame_height": 128, "frames": 4},
   "forest": {"file": "images/forest.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
   "fortress": {"file": "images/fortress.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
   "sanctuary": {"file": "images/sanctuary.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0}

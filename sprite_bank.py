@@ -79,3 +79,16 @@ class SpriteBank:
                         pos.y + float(config.get("offset_y", 8)), width, height)
         image.opacify(1)
         return True
+
+    def draw_cell(self, name, column, row, pos, width, height, alpha=1):
+        """장치·탄환·효과처럼 한 칸씩 사용하는 작은 시트의 지정 프레임."""
+        if name not in self.entries:
+            return False
+        image, _, fw, fh, _ = self.entries[name]
+        if column < 0 or row < 0 or (column + 1) * fw > image.w or (row + 1) * fh > image.h:
+            return False
+        image.opacify(alpha)
+        image.clip_draw(column * fw, image.h - (row + 1) * fh, fw, fh,
+                        pos.x, pos.y, width, height)
+        image.opacify(1)
+        return True

@@ -88,7 +88,7 @@ class Combat:
             self.events.append(("hit", device.pos))
             if device.hp <= 0:
                 dead += 1
-                self.events.append(("kill", device.pos))
+                self.events.append(("crystal_break" if device.kind == "crystal" else "terminal_on", device.pos))
         self.devices = [d for d in self.devices if d.hp > 0]
         removed = [b for b in self.projectiles if path_hits(slash.points, b.pos, slash.radius + b.radius)]
         if removed:
@@ -135,7 +135,8 @@ class Combat:
             enemy.update(dt, p, self.arena, self.enemies)
             if getattr(enemy, "projectile_request", False):
                 direction = enemy.direction.normalized()
-                self.projectiles.append(Projectile(enemy.pos + direction * (enemy.radius + 12), direction * 240))
+                self.projectiles.append(Projectile(enemy.pos + direction * (enemy.radius + 12), direction * 240,
+                                                   kind=enemy.kind))
                 enemy.projectile_request = False
         self.projectiles = [b for b in self.projectiles if b.update(dt, self.arena)]
         for device in self.devices:

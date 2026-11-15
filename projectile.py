@@ -10,6 +10,7 @@ class Projectile:
     velocity: Vec
     lifetime: float = 3.2
     radius: float = 9
+    kind: str = "mage"
 
     def update(self, dt, arena):
         self.pos = self.pos + self.velocity * dt

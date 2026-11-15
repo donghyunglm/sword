@@ -15,6 +15,7 @@ class Enemy:
     attack_wait: float = 0.7
     direction: Vec = field(default_factory=Vec)
     projectile_request: bool = False
+    cast_left: float = 0
 
     @classmethod
     def make(cls, uid, kind, pos):
@@ -26,12 +27,14 @@ class Enemy:
     def update(self, dt, player, arena, others=()):
         self.flash = max(0, self.flash - dt)
         self.attack_wait = max(0, self.attack_wait - dt)
+        self.cast_left = max(0, self.cast_left - dt)
         delta = player.pos - self.pos
 
         if self.kind == "mage":
             if self.attack_wait <= 0:
                 self.direction = delta.normalized()
                 self.projectile_request = True
+                self.cast_left = 0.32
                 self.attack_wait = 1.9
             desired = delta.normalized() * (-1 if delta.length() < 200 else 1 if delta.length() > 300 else 0)
             self.pos, _ = arena.move(self.pos, desired * (65 * dt), self.radius)
