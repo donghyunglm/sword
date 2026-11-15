@@ -42,6 +42,7 @@ class Slash:
     boosted: bool = False
     age: float = 0
     resolved: bool = False
+    style: str = "trail"
 
     @property
     def alive(self):

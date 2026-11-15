@@ -10,10 +10,13 @@ from projectile import Projectile
 
 
 class Combat:
-    def __init__(self, arena=None, player=None):
+    def __init__(self, arena=None, player=None, dual_mode=False):
         self.arena = arena or Arena()
         self.player = player or Player()
         self.trail = None
+        self.dual_mode = dual_mode
+        self.echo_pos = None
+        self.echo_remaining = 0.0
         self.slashes = []
         self.enemies = []
         self.devices = []
@@ -30,7 +33,8 @@ class Combat:
     def ready(self):
         p = self.player
         return (p.hp > 0 and not p.dash_left and p.cooldown <= 0
-                and self.trail is None and not any(not s.resolved for s in self.slashes))
+                and (self.echo_pos is None if self.dual_mode else self.trail is None)
+                and not any(not s.resolved for s in self.slashes))
 
     def spawn(self, kind, pos):
         self.uid += 1
@@ -49,11 +53,28 @@ class Combat:
             return False
         p = self.player
         p.dash_left = C.DASH_TIME
-        self.trail = Trail(p.pos, p.facing, p.trail_lifetime)
+        if self.dual_mode:
+            self.echo_pos, self.echo_remaining = p.pos, p.trail_lifetime
+        else:
+            self.trail = Trail(p.pos, p.facing, p.trail_lifetime)
         self.events.append(("dash", p.pos))
         return True
 
     def slash(self):
+        if self.dual_mode:
+            if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
+                    or any(not s.resolved for s in self.slashes)):
+                return False
+            points = [self.player.pos]
+            if self.echo_pos is not None:
+                points.append(self.echo_pos)
+            boosted = len(points) > 1
+            self.slashes.append(Slash(points, self.player.facing.normalized(),
+                                      55 + self.player.upgrades["range"] * 7,
+                                      boosted, style="dual"))
+            self.echo_pos, self.echo_remaining = None, 0
+            self.events.append(("slash", self.player.pos))
+            return True
         if self.trail is None or self.player.dash_left > 0:
             return False
         t = self.trail
@@ -66,9 +87,20 @@ class Combat:
 
     def resolve(self, slash):
         hits, dead, weak = 0, 0, False
+        def touches(pos, radius):
+            if slash.style != "dual":
+                return path_hits(slash.points, pos, slash.radius + radius)
+            for origin in slash.points:
+                delta = pos - origin
+                distance = delta.length()
+                if distance <= radius + 12 or (distance <= slash.radius + radius
+                                                and delta.normalized().x * slash.direction.x
+                                                + delta.normalized().y * slash.direction.y >= 0.35):
+                    return True
+            return False
         # 대상 객체당 한 번만 검사하므로 여러 경로 점에 겹쳐도 중복 피해가 없다.
         for enemy in self.enemies:
-            if enemy.hp <= 0 or not path_hits(slash.points, enemy.pos, slash.radius + enemy.radius):
+            if enemy.hp <= 0 or not touches(enemy.pos, enemy.radius):
                 continue
             if enemy.receive_slash():
                 hits += 1
@@ -79,7 +111,7 @@ class Combat:
                     dead += 1
                     self.events.append(("kill", enemy.pos))
         # 연결 단자는 같은 참격 경로에 두 개가 함께 놓여야 반응한다.
-        touched = [d for d in self.devices if path_hits(slash.points, d.pos, slash.radius + d.radius)]
+        touched = [d for d in self.devices if touches(d.pos, d.radius)]
         links = {d.link for d in touched if d.link and sum(other.link == d.link for other in touched) >= 2}
         for device in touched:
             if device.link and device.link not in links:
@@ -91,7 +123,7 @@ class Combat:
                 dead += 1
                 self.events.append(("crystal_break" if device.kind == "crystal" else "terminal_on", device.pos))
         self.devices = [d for d in self.devices if d.hp > 0]
-        removed = [b for b in self.projectiles if path_hits(slash.points, b.pos, slash.radius + b.radius)]
+        removed = [b for b in self.projectiles if touches(b.pos, b.radius)]
         if removed:
             self.projectiles = [b for b in self.projectiles if b not in removed]
             hits += len(removed)
@@ -99,8 +131,9 @@ class Combat:
         self.kills += dead
         self.last_hits = hits
         self.max_hits = max(self.max_hits, hits)
-        self.player.cooldown = 0 if hits >= 2 or weak else C.SINGLE_COOLDOWN if hits else C.MISS_COOLDOWN
-        if hits >= 2 or weak:
+        self.player.cooldown = (0.12 if weak else 0.34) if slash.style == "dual" else (
+            0 if hits >= 2 or weak else C.SINGLE_COOLDOWN if hits else C.MISS_COOLDOWN)
+        if (hits >= 2 or weak) and slash.style != "dual":
             self.events.append(("recharge", self.player.pos))
         if dead >= 3:
             self.prism = True
@@ -132,6 +165,10 @@ class Combat:
                     self.trail = None
                     p.cooldown = C.MISS_COOLDOWN
                     self.events.append(("expire", p.pos))
+            if self.dual_mode and self.echo_pos is not None:
+                self.echo_remaining = max(0, self.echo_remaining - dt)
+                if self.echo_remaining == 0:
+                    self.echo_pos = None
         for enemy in self.enemies:
             previous_state = enemy.state
             enemy.update(dt, p, self.arena, self.enemies)

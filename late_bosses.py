@@ -103,7 +103,7 @@ class Dragon:
             self.state, self.timer = "attack", 0.62 if self.attack == "breath" else 0.36
         elif self.state == "attack":
             if self.attack == "breath":
-                self.breath_reach = min(440, self.breath_reach + 1100 * dt)
+                self.breath_reach = min(440, self.breath_reach + 880 * dt)
                 if self.timer <= 0:
                     self.state, self.timer, self.weak_used = "weak", 1.3, False
             else:

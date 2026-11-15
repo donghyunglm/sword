@@ -61,7 +61,7 @@ class Game:
         player = Player(pos=Vec(*stage["start"]), hp=hp)
         if upgrades:
             player.upgrades = dict(upgrades)
-        self.combat = Combat(make_arena(stage), player)
+        self.combat = Combat(make_arena(stage), player, dual_mode=index == 14)
         self.mode, self.paused = "play", False
         self.wave_index = 0
         self.gate_open = False

@@ -209,6 +209,10 @@ class Renderer:
             frame = int(self.visual_time * 10) % 4
             if not self.bank.draw_cell("projectiles", frame, row, bullet.pos, 34, 34):
                 circle(bullet.pos, bullet.radius, WHITE, 230, True)
+        if combat.dual_mode and combat.echo_pos is not None:
+            alpha = int(70 + 100 * combat.echo_remaining / combat.player.trail_lifetime)
+            circle(combat.echo_pos, 31, CYAN, 80)
+            self.actor("player", combat.echo_pos, combat.player.facing, ghost=True, alpha=alpha)
         if combat.trail:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
@@ -218,47 +222,34 @@ class Renderer:
                 circle(pos, combat.player.slash_radius, CYAN, 35)
                 self.actor("player", pos, trail.direction, ghost=True, alpha=alpha)
         for enemy in combat.enemies:
-            if enemy.state == "tell":
-                length = 290 if enemy.kind in ("guardian", "knight") else 230
-                end = enemy.pos + enemy.direction * length
-                side = Vec(-enemy.direction.y, enemy.direction.x) * enemy.radius
+            if enemy.state == "tell" and enemy.kind != "dragon":
                 color = RED if enemy.kind == "guardian" else GOLD
-                line(enemy.pos - side, end - side, color, 170)
-                line(enemy.pos + side, end + side, color, 170)
-                line(end - side, end + side, color, 170)
-                circle(enemy.pos, enemy.radius + 7, color, 180)
+                circle(enemy.pos, enemy.radius + 7 + 3 * math.sin(self.visual_time * 15), color, 170)
             if enemy.kind in ("guardian", "knight", "dragon") and enemy.state == "weak":
                 circle(enemy.pos, enemy.radius + 7, GOLD, 160)
             if enemy.kind == "dragon" and enemy.state in ("tell", "attack"):
-                color = RED if enemy.state == "attack" else GOLD
-                if enemy.attack == "stomp":
-                    radius = 90 * (0.7 + 0.3 * (enemy.timer / 0.9)) if enemy.state == "tell" else 90
-                    circle(enemy.marker, radius, color, 200)
-                    circle(enemy.marker, 90, color, 35, True)
-                else:
-                    side = Vec(-enemy.direction.y, enemy.direction.x) * 56
-                    bounds = combat.arena.bounds
-                    reach = 440.0
-                    if enemy.direction.x > 0:
-                        reach = min(reach, (bounds.x + bounds.w - enemy.pos.x) / enemy.direction.x)
-                    elif enemy.direction.x < 0:
-                        reach = min(reach, (bounds.x - enemy.pos.x) / enemy.direction.x)
-                    if enemy.direction.y > 0:
-                        reach = min(reach, (bounds.y + bounds.h - enemy.pos.y) / enemy.direction.y)
-                    elif enemy.direction.y < 0:
-                        reach = min(reach, (bounds.y - enemy.pos.y) / enemy.direction.y)
-                    reach = max(0, reach)
-                    visible_reach = min(reach, enemy.breath_reach) if enemy.state == "attack" else reach
-                    end = enemy.pos + enemy.direction * visible_reach
-                    line(enemy.pos - side, end - side, color, 180)
-                    line(enemy.pos + side, end + side, color, 180)
+                if enemy.attack == "breath":
                     if enemy.state == "tell":
-                        circle(enemy.pos + enemy.direction * 30,
-                               12 + 12 * (1 - enemy.timer / 0.9), VIOLET, 150, True)
-                    if enemy.state == "attack" and visible_reach > 0:
-                        center = enemy.pos + enemy.direction * (visible_reach / 2)
-                        angle = math.atan2(enemy.direction.y, enemy.direction.x)
-                        self.bank.draw_rotated_cell("combat_fx", 3, 0, center, visible_reach, 105, angle, 0.85)
+                        charge = max(0, 1 - enemy.timer / 0.9)
+                        mouth = enemy.pos + enemy.direction * 30
+                        circle(mouth, 7 + charge * 13, VIOLET, int(80 + charge * 110), True)
+                    else:
+                        bounds = combat.arena.bounds
+                        reach = 440.0
+                        if enemy.direction.x > 0:
+                            reach = min(reach, (bounds.x + bounds.w - enemy.pos.x) / enemy.direction.x)
+                        elif enemy.direction.x < 0:
+                            reach = min(reach, (bounds.x - enemy.pos.x) / enemy.direction.x)
+                        if enemy.direction.y > 0:
+                            reach = min(reach, (bounds.y + bounds.h - enemy.pos.y) / enemy.direction.y)
+                        elif enemy.direction.y < 0:
+                            reach = min(reach, (bounds.y - enemy.pos.y) / enemy.direction.y)
+                        visible_reach = max(0, min(reach, enemy.breath_reach))
+                        if visible_reach > 0:
+                            center = enemy.pos + enemy.direction * (visible_reach / 2)
+                            angle = math.atan2(enemy.direction.y, enemy.direction.x)
+                            self.bank.draw_rotated_cell("combat_fx", 3, 0, center,
+                                                        visible_reach, 105, angle, 0.85)
             if enemy.state == "charge":
                 line(enemy.pos - enemy.direction * 40, enemy.pos, GOLD, 120)
         actors = [(e.pos.y, e) for e in combat.enemies]
@@ -296,15 +287,16 @@ class Renderer:
                 circle(actor.pos, actor.radius, GOLD if is_player else RED, 200)
         for slash in combat.slashes:
             n = len(slash.points)
-            indices = sorted({round(k * (n - 1) / 3) for k in range(4)})
+            indices = (range(n) if slash.style == "dual" else
+                       sorted({round(k * (n - 1) / 3) for k in range(4)}))
             for i in indices:
                 pos = slash.points[i]
                 alpha = int(190 * max(0, 1 - slash.age / 0.27))
                 self.actor("player", pos, slash.direction, ghost=True, alpha=alpha)
                 self.arc(pos, slash.radius, slash.direction, slash.age, GOLD if slash.boosted else CYAN)
-            center = slash.points[n // 2]
-            self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
-                                max(0, 1 - slash.age / 0.27))
+            for center in (slash.points if slash.style == "dual" else [slash.points[n // 2]]):
+                self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
+                                    max(0, 1 - slash.age / 0.27))
         for kind, pos, age in self.effects:
             color = RED if kind == "hurt" else GOLD if kind == "recharge" else CYAN
             alpha = int(max(0, 1 - age / 0.7) * 240)
@@ -340,9 +332,15 @@ class Renderer:
             color = RED if i < player.hp else (48, 57, 62)
             rect(34 + i * 25, 685, 18, 16, color)
             rect(38 + i * 25, 702, 10, 3, color)
-        status = "DASH READY" if c.ready else "DASHING" if player.dash_left else "J : 참격" if c.trail else "참격 중" if any(not s.resolved for s in c.slashes) else f"충전 {player.cooldown:.1f}s"
+        if c.dual_mode:
+            status = ("대시 중" if player.dash_left else "J  검사 + 잔영 동시 검격" if c.echo_pos is not None
+                      else f"검격 대기 {player.cooldown:.1f}초" if player.cooldown > 0
+                      else "J  직접 검격 / Space 잔영 배치")
+        else:
+            status = "DASH READY" if c.ready else "DASHING" if player.dash_left else "J : 참격" if c.trail else "참격 중" if any(not s.resolved for s in c.slashes) else f"충전 {player.cooldown:.1f}s"
         self.text(status, 215, 695, 20, CYAN if c.ready else GOLD)
-        self.text(f"최대 동시 적중 {c.max_hits}", 450, 695, 18, MUTED)
+        if not c.dual_mode:
+            self.text(f"최대 동시 적중 {c.max_hits}", 450, 695, 18, MUTED)
         goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.stage['goal'])} / {game.stage['goal']}"
         self.text(goal, 720, 731, 20, GOLD)
         rect(722, 688, 308, 8, (42, 49, 59))
@@ -350,6 +348,8 @@ class Renderer:
         rect(722, 688, 308 * ratio, 8, CYAN)
         if c.trail:
             self.text(f"잔영 {c.trail.remaining:.1f}초", 450, 731, 18, CYAN)
+        if c.dual_mode and c.echo_pos is not None:
+            self.text(f"잔영 {c.echo_remaining:.1f}초", 610, 695, 18, CYAN)
         if c.prism:
             self.text("PRISM / 다음 참격 확대", 720, 667, 16, GOLD)
         bosses = [e for e in c.enemies if e.kind in ("guardian", "knight", "dragon")]
@@ -361,7 +361,9 @@ class Renderer:
             state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! J 참격", "recover": "회복", "approach": "대기"}[boss.state]
             self.text(label + "  /  " + state, 360, 583, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, INK)
-        self.text("WASD / 방향키  이동     Space  대시     J  잔영 참격", 32, 51, 18, WHITE)
+        controls = ("WASD / 방향키  이동     J  직접 검격     Space  잔영 대시"
+                    if c.dual_mode else "WASD / 방향키  이동     Space  대시     J  잔영 참격")
+        self.text(controls, 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
         if game.toast_left > 0:
             rect(160, 120, 800, 43, INK, 230)

@@ -64,10 +64,10 @@ class LateCampaignTests(unittest.TestCase):
         dragon.update(0.02, player, Arena())
         self.assertEqual(dragon.state, "attack")
         self.assertFalse(dragon.threatens(Vec(560, 400)))
-        dragon.update(0.1, player, Arena())
+        dragon.update(0.12, player, Arena())
         self.assertTrue(dragon.threatens(Vec(560, 400)))
         self.assertFalse(dragon.threatens(Vec(560, 300)))
-        dragon.update(0.1, player, Arena())
+        dragon.update(0.12, player, Arena())
         self.assertTrue(dragon.threatens(Vec(560, 300)))
 
     def test_stomp_damages_only_on_landing(self):

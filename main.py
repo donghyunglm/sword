@@ -41,7 +41,8 @@ def prepare_scene(game, name):
         return
     game.training = False
     scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9,
-                    "sanctuary": 10, "dragon": 14, "dragon-attack": 14}
+                    "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14,
+                    "dragon-attack": 14}
     game.load_stage(scene_stages.get(name, 0), persist=False)
     if name == "play":
         game.combat.player.pos = Vec(660, 315)
@@ -62,6 +63,18 @@ def prepare_scene(game, name):
         dragon.direction = Vec(0, -1)
         dragon.breath_reach = 210
         game.combat.events.append(("boss_breath", dragon.pos))
+    if name == "dragon-windup":
+        dragon = game.combat.enemies[0]
+        dragon.attack, dragon.state, dragon.timer = "breath", "tell", 0.35
+        dragon.direction = Vec(0, -1)
+    if name == "dragon-dual":
+        dragon = game.combat.enemies[0]
+        dragon.state, dragon.timer = "weak", 1.0
+        game.combat.player.pos = Vec(620, 410)
+        game.combat.player.facing = Vec(0, 1)
+        game.combat.echo_pos = Vec(500, 410)
+        game.combat.echo_remaining = game.combat.player.trail_lifetime
+        game.combat.slash()
     if name in ("upgrade", "defeat", "victory"):
         game.mode = name
 
@@ -71,7 +84,8 @@ def main(argv=None):
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
     parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight",
-                                            "sanctuary", "dragon", "dragon-attack", "upgrade", "defeat", "victory"), default="play")
+                                            "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack",
+                                            "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--capture", type=Path)
     parser.add_argument("--mute", action="store_true")

@@ -84,8 +84,14 @@ def run(start=0):
                     c.dash()
                 elif target.state in ("approach", "recover", "tell", "weak", "attack"):
                     direction = delta.normalized() if distance > 78 else delta.normalized() * -1 if distance < 68 else Vec()
-                if c.trail and not player.dash_left and target.state == "weak":
-                    if path_hits(c.trail.points, target.pos, player.slash_radius + target.radius):
+                if target.state == "weak" and not player.dash_left:
+                    if c.dual_mode:
+                        origins = [player.pos] + ([c.echo_pos] if c.echo_pos is not None else [])
+                        origin = min(origins, key=lambda p: p.distance(target.pos))
+                        if origin.distance(target.pos) <= 55 + player.upgrades["range"] * 7 + target.radius:
+                            player.facing = (target.pos - origin).normalized()
+                            c.slash()
+                    elif c.trail and path_hits(c.trail.points, target.pos, player.slash_radius + target.radius):
                         c.slash()
             elif target.kind in ("guardian", "knight", "boar", "sentinel"):
                 if target.state == "tell" and target.timer < 0.16 and c.ready:
