@@ -75,7 +75,7 @@ class Combat:
             boosted = len(points) > 1
             self.slashes.append(Slash(points, self.player.facing.normalized(),
                                       55 + self.player.upgrades["range"] * 7,
-                                      boosted, style="dual"))
+                                      boosted, style="dual", weapon=self.player.weapon))
             self.echo_pos, self.echo_remaining = None, 0
             self.events.append(("slash", self.player.pos))
             return True
@@ -83,7 +83,8 @@ class Combat:
             return False
         if self.trail is None:
             self.slashes.append(Slash([self.player.pos], self.player.facing.normalized(),
-                                      55 + self.player.upgrades["range"] * 7, style="direct"))
+                                      55 + self.player.upgrades["range"] * 7, style="direct",
+                                      weapon=self.player.weapon))
             self.events.append(("slash", self.player.pos))
             return True
         t = self.trail
@@ -94,7 +95,7 @@ class Combat:
             points.append(t.points[-1])
         self.slashes.append(Slash(points, t.direction,
                                   self.player.slash_radius * (1.3 if self.prism else 1),
-                                  self.prism, style="chain"))
+                                  self.prism, style="chain", weapon=self.player.weapon))
         self.prism = False
         self.trail = None
         self.events.append(("slash", self.player.pos))
@@ -122,6 +123,14 @@ class Combat:
             if (enemy.hp <= 0 or (enemy.uid in slash.hit_ids and not chain_boss)
                     or not touches(enemy.pos, enemy.radius)):
                 continue
+            if slash.weapon == 2 and enemy.uid not in slash.frost_ids:
+                if boss_target:
+                    if enemy.state in ("approach", "tell"):
+                        enemy.timer += 0.22
+                else:
+                    enemy.slow_left = max(enemy.slow_left, 1.5)
+                slash.frost_ids.add(enemy.uid)
+                self.events.append(("frost", enemy.pos))
             landed = False
             if chain_boss and 0 < slash.boss_hits.get(enemy.uid, 0) < 3 and enemy.state == "weak":
                 enemy.hp -= 1
@@ -130,6 +139,9 @@ class Combat:
             elif enemy.uid not in slash.hit_ids:
                 landed = enemy.receive_slash()
             if landed:
+                if slash.weapon == 3 and enemy.uid not in slash.hit_ids:
+                    if boss_target or enemy.kind in ("boar", "sentinel"):
+                        enemy.hp -= 1
                 slash.hit_ids.add(enemy.uid)
                 if chain_boss:
                     slash.boss_hits[enemy.uid] = slash.boss_hits.get(enemy.uid, 0) + 1
@@ -147,7 +159,8 @@ class Combat:
                 continue
             if device.kind == "crystal" and not self.purification:
                 continue
-            device.receive_slash(2 if device.kind == "crystal" and self.seal_break else 1)
+            device.receive_slash(2 if device.kind == "crystal" and self.seal_break
+                                 and slash.weapon == 3 else 1)
             slash.hit_ids.add(device.uid)
             hits += 1
             self.events.append(("hit", device.pos))
@@ -186,6 +199,8 @@ class Combat:
         self.max_hits = max(self.max_hits, hits)
         self.player.cooldown = (0.12 if slash.boosted else 0.34) if slash.style == "dual" else (
             0 if hits >= 2 or slash.boosted else C.SINGLE_COOLDOWN if hits else C.MISS_COOLDOWN)
+        if slash.weapon == 3:
+            self.player.cooldown = max(self.player.cooldown, 0.70)
         if hits >= 2 or slash.boosted:
             self.events.append(("recharge", self.player.pos))
         if hits >= 3:
@@ -243,7 +258,8 @@ class Combat:
         for slash in self.slashes:
             slash.age += dt
             if slash.style == "chain" and not slash.resolved:
-                while slash.next_point < len(slash.points) and slash.age >= C.SLASH_HIT_TIME + slash.next_point * 0.045:
+                interval = 0.06 if slash.weapon == 3 else 0.045
+                while slash.next_point < len(slash.points) and slash.age >= C.SLASH_HIT_TIME + slash.next_point * interval:
                     point = slash.points[slash.next_point]
                     slash.points, original = [point], slash.points
                     self.resolve(slash)

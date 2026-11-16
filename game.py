@@ -51,7 +51,7 @@ class Game:
     def snapshot(self, phase="play"):
         p = self.combat.player
         return {"version": 1, "stage": self.index, "phase": phase, "hp": max(1, p.hp),
-                "upgrades": dict(p.upgrades), "cleared": list(self.cleared)}
+                "upgrades": dict(p.upgrades), "cleared": list(self.cleared), "weapon": p.weapon}
 
     def persist(self, phase="play"):
         if self.training or self.trial:
@@ -63,12 +63,13 @@ class Game:
         except OSError:
             self.notice = "저장할 수 없습니다. 현재 게임은 계속할 수 있습니다."
 
-    def load_stage(self, index, upgrades=None, hp=C.MAX_HP, persist=True):
+    def load_stage(self, index, upgrades=None, hp=C.MAX_HP, persist=True, weapon=1):
         self.index = index
         stage = self.stage
         self.goal = stage["goal"] - (sum(kind == "wolf" for _, wave in stage["waves"] for kind, _, _ in wave)
                                      if index == 8 and 7 in self.cleared else 0)
         player = Player(pos=Vec(*stage["start"]), hp=hp)
+        player.weapon = weapon if weapon in self.available_weapons(index) else 1
         if upgrades:
             player.upgrades = dict(upgrades)
         self.combat = Combat(make_arena(stage), player,
@@ -116,7 +117,8 @@ class Game:
             return False
         data = copy.deepcopy(self.saved)
         self.training, self.trial, self.cleared = False, False, data["cleared"]
-        self.load_stage(data["stage"], data["upgrades"], data["hp"], persist=False)
+        self.load_stage(data["stage"], data["upgrades"], data["hp"], persist=False,
+                        weapon=data.get("weapon", 1))
         self.mode = data["phase"]
         self.gate_open = self.mode != "play"
         if self.mode != "play":
@@ -160,7 +162,23 @@ class Game:
         if self.round_start:
             data = copy.deepcopy(self.round_start)
             self.cleared = data["cleared"]
-            self.load_stage(data["stage"], data["upgrades"], data["hp"])
+            self.load_stage(data["stage"], data["upgrades"], data["hp"], weapon=data.get("weapon", 1))
+
+    @staticmethod
+    def available_weapons(index):
+        return (1,) + ((2,) if index >= 8 else ()) + ((3,) if index >= 10 else ())
+
+    def select_weapon(self, number):
+        if self.mode != "play" or self.paused or number not in (1, 2, 3):
+            return False
+        if number not in self.available_weapons(self.index):
+            self.tell("아직 획득하지 않은 무기입니다.")
+            return False
+        if self.combat.player.weapon != number:
+            self.combat.player.weapon = number
+            self.combat.events.append(("weapon_switch", self.combat.player.pos))
+            self.tell({1: "기본 검", 2: "냉기 검 · 적 둔화", 3: "파쇄 검 · 느리지만 강력한 일격"}[number], 1.7)
+        return True
 
     def exit_to_title(self):
         self.mode, self.paused = "title", False
@@ -179,13 +197,14 @@ class Game:
         levels = dict(p.upgrades)
         levels[key] += 1
         hp = C.MAX_HP
-        self.load_stage(self.index + 1, levels, hp)
+        self.load_stage(self.index + 1, levels, hp, weapon=p.weapon)
         return True
 
     def skip_upgrade(self):
         if self.mode != "upgrade" or any(self.combat.player.upgrades[k] < C.UPGRADE_LIMIT for k in C.UPGRADES):
             return False
-        self.load_stage(self.index + 1, self.combat.player.upgrades, C.MAX_HP)
+        self.load_stage(self.index + 1, self.combat.player.upgrades, C.MAX_HP,
+                        weapon=self.combat.player.weapon)
         return True
 
     def enter_gate(self):

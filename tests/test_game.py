@@ -191,6 +191,26 @@ class GameTests(unittest.TestCase):
         g.update(0.1)
         self.assertGreater(fireballs[0].pos.distance(start), 20)
 
+    def test_weapon_unlock_switch_and_save_restore(self):
+        g = self.game
+        g.new_game()
+        self.assertFalse(g.select_weapon(2))
+        g.cleared = list(range(8))
+        g.load_stage(8)
+        self.assertTrue(g.select_weapon(2))
+        self.assertEqual(g.combat.player.weapon, 2)
+        g.gate_open = True
+        g.enter_gate()
+        restored = Game(self.path)
+        self.assertTrue(restored.continue_game())
+        self.assertEqual(restored.combat.player.weapon, 2)
+        restored.choose_upgrade(0)
+        self.assertEqual(restored.combat.player.weapon, 2)
+        self.assertFalse(restored.select_weapon(3))
+        restored.cleared = list(range(10))
+        restored.load_stage(10, persist=False)
+        self.assertTrue(restored.select_weapon(3))
+
 
 if __name__ == "__main__":
     unittest.main()

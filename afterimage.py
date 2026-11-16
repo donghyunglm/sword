@@ -42,16 +42,20 @@ class Slash:
     age: float = 0
     resolved: bool = False
     style: str = "trail"
+    weapon: int = 1
     next_point: int = 0
     hit_ids: object = None
     pending_links: object = None
     boss_hits: object = None
+    frost_ids: object = None
 
     def __post_init__(self):
         self.hit_ids = set() if self.hit_ids is None else self.hit_ids
         self.pending_links = set() if self.pending_links is None else self.pending_links
         self.boss_hits = {} if self.boss_hits is None else self.boss_hits
+        self.frost_ids = set() if self.frost_ids is None else self.frost_ids
 
     @property
     def alive(self):
-        return self.age < (0.20 + len(self.points) * 0.045 if self.style == "chain" else 0.27)
+        interval = 0.06 if self.weapon == 3 else 0.045
+        return self.age < (0.20 + len(self.points) * interval if self.style == "chain" else 0.27)

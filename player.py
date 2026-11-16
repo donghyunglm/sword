@@ -13,6 +13,7 @@ class Player:
     dash_left: float = 0
     cooldown: float = 0
     moving: bool = False
+    weapon: int = 1
     upgrades: dict = field(default_factory=lambda: dict.fromkeys(C.UPGRADES, 0))
 
     @property

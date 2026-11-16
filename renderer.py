@@ -15,6 +15,12 @@ CYAN = (104, 231, 210)
 GOLD = (246, 204, 116)
 VIOLET = (183, 128, 216)
 RED = (234, 108, 112)
+FROST = (160, 220, 255)
+SHATTER = (255, 178, 93)
+
+
+def weapon_color(number):
+    return FROST if number == 2 else SHATTER if number == 3 else CYAN
 
 def rect(x, y, w, h, color, alpha=255, filled=True):
     p.draw_rectangle(int(x), int(y), int(x + w), int(y + h), *color, alpha, filled)
@@ -61,7 +67,8 @@ class Renderer:
     def consume(self, events):
         for kind, pos in events:
             if kind in ("hit", "kill", "hurt", "recharge", "open", "crystal_break", "terminal_on",
-                        "boss_impact", "boss_breath", "boss_hit", "production", "beacon_hit"):
+                        "boss_impact", "boss_breath", "boss_hit", "production", "beacon_hit",
+                        "frost", "weapon_switch"):
                 self.effects.append([kind, pos, 0.0])
             if kind == "hurt":
                 self.shake = 0.18
@@ -222,7 +229,7 @@ class Renderer:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
             for a, b in zip(trail.points, trail.points[1:]):
-                line(a, b, CYAN, alpha // 2)
+                line(a, b, weapon_color(combat.player.weapon), alpha // 2)
             visible = trail.visible_points()
             for i, pos in enumerate(visible):
                 fade = int(alpha * (0.3 + 0.7 * (i + 1) / len(visible)))
@@ -289,9 +296,12 @@ class Renderer:
                        animation_time=animation_time)
             if not is_player and actor.kind in ("boar", "sentinel") and actor.hp == 1:
                 rect(actor.pos.x - 11, actor.pos.y + 37, 22, 3, RED)
+            if not is_player and getattr(actor, "slow_left", 0) > 0:
+                circle(actor.pos, actor.radius + 7, FROST, 125)
             if self.debug:
                 circle(actor.pos, actor.radius, GOLD if is_player else RED, 200)
         for slash in combat.slashes:
+            blade = weapon_color(slash.weapon)
             if slash.style == "chain":
                 for i in range(slash.next_point, len(slash.points)):
                     pos = slash.points[i]
@@ -300,10 +310,15 @@ class Renderer:
                 if slash.next_point:
                     index = min(slash.next_point - 1, len(slash.points) - 1)
                     pos = slash.points[index]
-                    phase = max(0, slash.age - (C.SLASH_HIT_TIME + index * 0.045))
+                    interval = 0.06 if slash.weapon == 3 else 0.045
+                    phase = max(0, slash.age - (C.SLASH_HIT_TIME + index * interval))
                     if phase < 0.13:
-                        self.arc(pos, slash.radius + 10, slash.direction, phase, GOLD)
-                        self.bank.draw_cell("combat_fx", 0, 0, pos, 80, 80, 1 - phase / 0.13)
+                        self.arc(pos, slash.radius + (16 if slash.weapon == 3 else 10),
+                                 slash.direction, phase, blade)
+                        if slash.weapon == 3:
+                            circle(pos, 22 + phase * 90, SHATTER, int(180 * (1 - phase / 0.13)))
+                        else:
+                            self.bank.draw_cell("combat_fx", 0, 0, pos, 80, 80, 1 - phase / 0.13)
                 continue
             n = len(slash.points)
             indices = (range(n) if slash.style == "dual" else
@@ -312,12 +327,17 @@ class Renderer:
                 pos = slash.points[i]
                 alpha = int(190 * max(0, 1 - slash.age / 0.27))
                 self.actor("player", pos, slash.direction, ghost=True, alpha=alpha)
-                self.arc(pos, slash.radius, slash.direction, slash.age, GOLD if slash.boosted else CYAN)
+                self.arc(pos, slash.radius, slash.direction, slash.age, blade)
             for center in (slash.points if slash.style == "dual" else [slash.points[n // 2]]):
-                self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
-                                    max(0, 1 - slash.age / 0.27))
+                if slash.weapon == 3:
+                    circle(center, 27 + slash.age * 60, SHATTER, int(max(0, 1 - slash.age / 0.27) * 180))
+                else:
+                    self.bank.draw_cell("combat_fx", 0, 0, center, 77, 77,
+                                        max(0, 1 - slash.age / 0.27))
         for kind, pos, age in self.effects:
-            color = RED if kind in ("hurt", "production", "beacon_hit") else GOLD if kind == "recharge" else CYAN
+            color = (RED if kind in ("hurt", "production", "beacon_hit") else
+                     FROST if kind == "frost" else SHATTER if kind == "weapon_switch" else
+                     GOLD if kind == "recharge" else CYAN)
             alpha = int(max(0, 1 - age / 0.7) * 240)
             if kind == "crystal_break" and self.bank.draw_cell("crystal", 2, 0, pos, 72, 72, alpha / 255):
                 continue
@@ -330,8 +350,8 @@ class Renderer:
                 circle(pos, size, GOLD if kind == "boss_hit" else RED, alpha)
                 circle(pos, size * 0.7, GOLD if kind == "boss_hit" else VIOLET, alpha // 2)
                 self.bank.draw_cell("combat_fx", 1, 0, pos, 120, 120, alpha / 255)
-            if kind in ("production", "beacon_hit"):
-                circle(pos, 30 + age * 70, VIOLET, alpha)
+            if kind in ("production", "beacon_hit", "frost", "weapon_switch"):
+                circle(pos, 30 + age * 70, color, alpha)
             for i in range(6):
                 q = pos + Vec(math.cos(i * 1.8), math.sin(i * 1.8)) * (age * 80 + 5)
                 rect(q.x, q.y, 4, 4, color, alpha)
@@ -362,6 +382,14 @@ class Renderer:
         self.text(status, 215, 695, 20, CYAN if c.ready else GOLD)
         if not c.dual_mode:
             self.text(f"최대 연속 적중 {c.max_hits}", 450, 695, 18, MUTED)
+        for number, name in ((1, "기본"), (2, "냉기"), (3, "파쇄")):
+            x = 216 + (number - 1) * 112
+            unlocked = number in game.available_weapons(game.index)
+            selected = player.weapon == number
+            color = weapon_color(number) if unlocked else MUTED
+            rect(x, 663, 105, 23, color if selected else (38, 50, 59), 170)
+            self.text(f"{number}  {name if unlocked else '잠김'}", x + 8, 668, 16,
+                      INK if selected else color)
         goal = "적을 모아 잔영으로 베어 보세요" if game.training else f"봉인 해제  {min(c.kills, game.goal)} / {game.goal}"
         self.text(goal, 720, 731, 20, GOLD)
         if game.index == 1 and game.mode == "play":
@@ -388,7 +416,7 @@ class Renderer:
             state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! J 참격", "recover": "회복", "approach": "대기"}[boss.state]
             self.text(label + "  /  " + state, 360, 583, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, INK)
-        controls = "WASD / 방향키  이동     J  직접 검격 / 잔영 연속 참격     Space  대시"
+        controls = "이동 WASD / 방향키     J 검격     Space 대시     1~3 무기 선택"
         self.text(controls, 32, 51, 18, WHITE)
         self.text("Esc 일시정지    F1 판정 표시    M 효과음 " + ("켜짐" if self.audio_enabled else "꺼짐"), 32, 23, 16, MUTED)
         if game.toast_left > 0:
@@ -444,7 +472,8 @@ class Renderer:
         elif game.mode == "upgrade":
             self.shade()
             reward = ("정화의 검 획득 · 결정과 탄환을 벨 수 있습니다" if game.index == 4 else
-                      "봉인 파쇄 획득 · 성역의 결정을 한 번에 깹니다" if game.index == 9 else
+                      "냉기 검 획득 · 다음 라운드부터 2번으로 전환" if game.index == 7 else
+                      "파쇄 검 획득 · 다음 라운드부터 3번으로 전환" if game.index == 9 else
                       "검에 남은 빛으로 한 가지 힘을 회복하세요")
             self.center("봉인이 풀렸다", 554, 42, CYAN)
             self.center(reward, 496, 23, WHITE)

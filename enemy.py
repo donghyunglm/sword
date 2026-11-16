@@ -16,6 +16,7 @@ class Enemy:
     direction: Vec = field(default_factory=Vec)
     projectile_request: bool = False
     cast_left: float = 0
+    slow_left: float = 0
 
     @classmethod
     def make(cls, uid, kind, pos):
@@ -28,6 +29,8 @@ class Enemy:
         self.flash = max(0, self.flash - dt)
         self.attack_wait = max(0, self.attack_wait - dt)
         self.cast_left = max(0, self.cast_left - dt)
+        self.slow_left = max(0, self.slow_left - dt)
+        slow = 0.55 if self.slow_left > 0 else 1.0
         delta = player.pos - self.pos
 
         if self.kind == "mage":
@@ -37,7 +40,7 @@ class Enemy:
                 self.cast_left = 0.32
                 self.attack_wait = 1.9
             desired = delta.normalized() * (-1 if delta.length() < 200 else 1 if delta.length() > 300 else 0)
-            self.pos, _ = arena.move(self.pos, desired * (65 * dt), self.radius)
+            self.pos, _ = arena.move(self.pos, desired * (65 * slow * dt), self.radius)
             return
         if self.state == "tell":
             self.timer -= dt
@@ -45,7 +48,7 @@ class Enemy:
                 self.state, self.timer = "charge", 0.46
             return
         if self.state == "charge":
-            self.pos, blocked = arena.move(self.pos, self.direction * (480 * dt), self.radius, False)
+            self.pos, blocked = arena.move(self.pos, self.direction * (480 * slow * dt), self.radius, False)
             self.timer -= dt
             if self.timer <= 0 or blocked:
                 self.state, self.timer = "recover", 0.7
@@ -66,7 +69,7 @@ class Enemy:
             if e.uid != self.uid and 0.01 < d.length() < self.radius + e.radius + 4:
                 separation = separation + d.normalized() * 0.5
         desired = (desired + separation).normalized()
-        speed = 112 if self.kind == "wolf" else 83 if self.kind == "boar" else 94
+        speed = (112 if self.kind == "wolf" else 83 if self.kind == "boar" else 94) * slow
         proposed, _ = arena.move(self.pos, desired * (speed * dt), self.radius)
         if proposed.distance(self.pos) < speed * dt * 0.2 and delta.length() > 45:
             # 초기의 단순한 장애물에 대한 국소 우회. 고급 길 찾기는 사용하지 않는다.

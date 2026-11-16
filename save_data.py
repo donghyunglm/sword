@@ -26,6 +26,11 @@ def validate(data, stage_count=None):
         raise ValueError("강화 횟수가 잘못되었습니다.")
     if data.get("phase") not in ("play", "upgrade", "victory"):
         raise ValueError("진행 상태가 잘못되었습니다.")
+    weapon = data.get("weapon", 1)
+    if type(weapon) is not int or weapon not in (1, 2, 3):
+        raise ValueError("무기 정보가 잘못되었습니다.")
+    if (weapon == 2 and index < 8) or (weapon == 3 and index < 10):
+        raise ValueError("획득하지 않은 무기가 저장되었습니다.")
     if type(data.get("hp")) is not int or not 1 <= data["hp"] <= C.MAX_HP:
         raise ValueError("체력 정보가 잘못되었습니다.")
     cleared = data.get("cleared")

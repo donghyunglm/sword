@@ -114,12 +114,31 @@ class CombatTests(unittest.TestCase):
 
     def test_seal_break_destroys_crystal_in_one_strike(self):
         c = Combat(seal_break=True)
+        c.player.weapon = 3
         c.player.pos = Vec(500, 340)
         c.player.facing = Vec(0, 1)
         c.spawn_device("crystal", Vec(500, 400))
         c.slash()
         self.tick(c, 0.08)
         self.assertFalse(c.devices)
+
+    def test_frost_slows_armored_enemy(self):
+        c = Combat()
+        c.player.weapon = 2
+        boar = c.spawn("boar", Vec(560, 240))
+        c.slash()
+        self.tick(c, 0.08)
+        self.assertGreater(boar.slow_left, 1.3)
+        self.assertEqual(boar.hp, 1)
+
+    def test_shatter_breaks_armored_enemy_but_recovers_slowly(self):
+        c = Combat()
+        c.player.weapon = 3
+        c.spawn("boar", Vec(560, 240))
+        c.slash()
+        self.tick(c, 0.08)
+        self.assertEqual(c.kills, 1)
+        self.assertGreater(c.player.cooldown, 0.6)
 
 
 if __name__ == "__main__":
