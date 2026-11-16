@@ -431,6 +431,24 @@ class Renderer:
     def shade(self):
         rect(0, 78, C.WIDTH, 582, INK, 240)
 
+    def transit_scene(self, game):
+        progress = game.transit_progress
+        source = game.stage.get("theme", "forest")
+        destination = game.stages[game.index + 1].get("theme", "forest")
+        rect(0, 0, C.WIDTH, C.HEIGHT, INK)
+        self.bank.draw(source, Vec(560, 366), 0, alpha=1)
+        self.bank.draw(destination, Vec(560, 366), 0, alpha=progress)
+        # 길바닥이 아래로 흐르고 검사는 제자리에 남아 카메라가 따라가는 느낌을 준다.
+        rect(430, 100, 260, 535, INK, 145)
+        for i in range(9):
+            y = 115 + ((i * 85 - progress * 430) % 535)
+            line(Vec(442, y), Vec(678, y), CYAN if destination == "sanctuary" else MUTED, 70)
+        line(Vec(430, 100), Vec(430, 635), CYAN, 120)
+        line(Vec(690, 100), Vec(690, 635), CYAN, 120)
+        self.actor("player", Vec(game.transit_x, 180), Vec(0, 1), state="walk")
+        self.center(f"{game.stage['title']}  →  {game.stages[game.index + 1]['title']}", 705, 26, WHITE)
+        self.center("W / ↑  앞으로 이동", 43, 20, CYAN)
+
     def title(self, game):
         # 임시 2D 타이틀 연출. 실제 게임과 같은 스프라이트를 사용한다.
         for i in range(4):
@@ -472,7 +490,6 @@ class Renderer:
         elif game.mode == "upgrade":
             self.shade()
             reward = ("정화의 검 획득 · 결정과 탄환을 벨 수 있습니다" if game.index == 4 else
-                      "냉기 검 획득 · 다음 라운드부터 2번으로 전환" if game.index == 7 else
                       "파쇄 검 획득 · 다음 라운드부터 3번으로 전환" if game.index == 9 else
                       "검에 남은 빛으로 한 가지 힘을 회복하세요")
             self.center("봉인이 풀렸다", 554, 42, CYAN)
@@ -486,9 +503,9 @@ class Renderer:
                 self.text(f"{i + 1}   {name}", 247, y, 26, GOLD if level < C.UPGRADE_LIMIT else MUTED)
                 self.text(f"{level} / {C.UPGRADE_LIMIT} 단계    {detail}", 520, y, 20, MUTED)
             if all(level >= C.UPGRADE_LIMIT for level in game.combat.player.upgrades.values()):
-                self.center("모든 강화 완료 / Enter로 다음 라운드", 121, 18, CYAN)
+                self.center("모든 강화 완료 / Enter로 다음 길 이동", 121, 18, CYAN)
             else:
-                self.center("강화 확정 후 체력 완전 회복 / 다음 라운드로 이동", 121, 18, CYAN)
+                self.center("강화 확정 후 다음 길로 이동", 121, 18, CYAN)
             if game.toast_left > 0:
                 self.center(game.toast, 166, 18, RED)
         elif game.mode == "defeat":
@@ -507,6 +524,9 @@ class Renderer:
             self.center("Enter / Q   타이틀로", 172, 23, CYAN)
 
     def draw(self, game):
+        if game.mode == "transit":
+            self.transit_scene(game)
+            return
         self.floor(game)
         if game.mode not in ("title", "select"):
             self.scene(game)

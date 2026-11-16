@@ -51,20 +51,19 @@ class GameTests(unittest.TestCase):
         g.new_game()
         g.gate_open = True
         g.enter_gate()
-        self.assertEqual(g.mode, "upgrade")
+        self.assertEqual(g.mode, "transit")
         self.assertFalse(g.enter_gate())
         continued = Game(self.path)
         continued.continue_game()
-        self.assertEqual(continued.mode, "upgrade")
-        continued.choose_upgrade(0)
+        self.assertEqual(continued.mode, "transit")
+        continued.update(1.3, Vec(0, 1))
         self.assertEqual(continued.index, 1)
-        self.assertEqual(continued.combat.player.upgrades["range"], 1)
         self.assertFalse(continued.choose_upgrade(0))
         continued.combat.player.hp = 0
         continued.mode = "defeat"
         continued.retry()
         self.assertEqual(continued.cleared, [0])
-        self.assertEqual(sum(continued.combat.player.upgrades.values()), 1)
+        self.assertEqual(sum(continued.combat.player.upgrades.values()), 0)
         self.assertEqual(continued.combat.kills, 0)
 
     def test_fifteenth_round_finishes_campaign_without_loop(self):
@@ -75,8 +74,10 @@ class GameTests(unittest.TestCase):
             g.gate_open = True
             g.enter_gate()
             if i < 14:
-                if not g.choose_upgrade(i % 3):
-                    g.skip_upgrade()
+                if g.mode == "upgrade":
+                    g.choose_upgrade(i % 3)
+                self.assertEqual(g.mode, "transit")
+                g.update(1.3, Vec(0, 1))
         self.assertEqual(g.mode, "victory")
         self.assertEqual(g.index, 14)
         restored = Game(self.path)
@@ -112,12 +113,15 @@ class GameTests(unittest.TestCase):
 
     def test_upgrade_restores_health_for_next_round(self):
         g = self.game
-        g.new_game()
+        g.cleared = list(range(4))
+        g.load_stage(4, persist=False)
         g.combat.player.hp = 1
         g.gate_open = True
         g.enter_gate()
+        self.assertEqual(g.mode, "upgrade")
         g.choose_upgrade(0)
         self.assertEqual(g.combat.player.hp, 6)
+        self.assertEqual(g.mode, "transit")
 
     def test_trial_stage_selection_preserves_existing_save(self):
         g = self.game

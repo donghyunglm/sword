@@ -24,7 +24,7 @@ def validate(data, stage_count=None):
         raise ValueError("강화 단계가 잘못되었습니다.")
     if sum(upgrades.values()) > stage_count - 1:
         raise ValueError("강화 횟수가 잘못되었습니다.")
-    if data.get("phase") not in ("play", "upgrade", "victory"):
+    if data.get("phase") not in ("play", "upgrade", "transit", "victory"):
         raise ValueError("진행 상태가 잘못되었습니다.")
     weapon = data.get("weapon", 1)
     if type(weapon) is not int or weapon not in (1, 2, 3):

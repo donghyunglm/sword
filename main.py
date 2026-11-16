@@ -42,7 +42,7 @@ def prepare_scene(game, name):
     game.training = False
     scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9, "chain": 0, "beacon": 1,
                     "weapon-frost": 8, "weapon-shatter": 10,
-                    "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14,
+                    "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14, "transit": 4,
                     "dragon-attack": 14}
     game.load_stage(scene_stages.get(name, 0), persist=False)
     if name == "play":
@@ -74,6 +74,12 @@ def prepare_scene(game, name):
     if name == "beacon":
         game.combat.spawn("wolf", Vec(470, 455))
         game.combat.spawn("wolf", Vec(650, 455))
+    if name == "transit":
+        game.trial = True
+        game.gate_open = True
+        game.enter_gate()
+        game.choose_upgrade(0)
+        game.transit_progress = 0.5
     if name in ("weapon-frost", "weapon-shatter"):
         game.combat.player.weapon = 2 if name == "weapon-frost" else 3
         game.combat.player.pos = Vec(560, 330)
@@ -111,7 +117,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="잔영의 검 / Python + pico2d")
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
-    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon", "weapon-frost", "weapon-shatter",
+    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon", "weapon-frost", "weapon-shatter", "transit",
                                             "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack",
                                             "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
@@ -222,6 +228,9 @@ def main(argv=None):
                         elif key == pico.SDLK_RETURN:
                             game.skip_upgrade()
                         elif key == pico.SDLK_q:
+                            game.exit_to_title()
+                    elif game.mode == "transit":
+                        if key in (pico.SDLK_ESCAPE, pico.SDLK_q):
                             game.exit_to_title()
                     elif game.mode == "defeat":
                         if key in (pico.SDLK_r, pico.SDLK_RETURN):

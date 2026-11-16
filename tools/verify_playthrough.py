@@ -30,6 +30,9 @@ def run(start=0):
         if game.mode == "victory":
             print("PLAYTHROUGH OK:", " / ".join(seen), "재도전", defeated)
             return True
+        if game.mode == "transit":
+            game.update(1 / 120, Vec(0, 1))
+            continue
         if game.mode == "upgrade":
             choice = next((i for i, key in enumerate(("range", "lifetime", "speed"))
                            if game.combat.player.upgrades[key] < 3), None)

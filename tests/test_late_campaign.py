@@ -93,7 +93,8 @@ class LateCampaignTests(unittest.TestCase):
             game.load_stage(10, {"range": 3, "lifetime": 3, "speed": 3})
             game.gate_open = True
             game.enter_gate()
-            self.assertTrue(game.skip_upgrade())
+            self.assertEqual(game.mode, "transit")
+            game.update(1.3, Vec(0, 1))
             self.assertEqual(game.stage["id"], "3-2")
             restored = Game(path)
             self.assertTrue(restored.continue_game())

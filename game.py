@@ -40,6 +40,8 @@ class Game:
         self.beacon_timer = 1.0
         self.remote_timer = 2.4
         self.remote_shots = 0
+        self.transit_progress = 0.0
+        self.transit_x = 560.0
 
     @property
     def stage(self):
@@ -78,6 +80,7 @@ class Game:
         self.beacon_hp = 8 if index == 1 else 0
         self.beacon_timer = 1.0
         self.remote_timer, self.remote_shots = 2.4, 0
+        self.transit_progress, self.transit_x = 0.0, 560.0
         self.mode, self.paused = "play", False
         self.wave_index = 0
         self.gate_open = False
@@ -101,7 +104,9 @@ class Game:
                 boss.hp = boss.max_hp
         self.round_start = copy.deepcopy(self.snapshot())
         if index == 8 and 7 in self.cleared:
-            self.tell("생산 결정을 파괴해 요새의 늑대 증원이 끊겼습니다.", 4)
+            self.tell("냉기 검 획득! 2번으로 전환 · 요새의 늑대 증원이 끊겼습니다.", 4)
+        elif index == 10 and 9 in self.cleared:
+            self.tell("파쇄 검 획득! 3번으로 전환해 성역의 결정을 깨세요.", 4)
         elif index == 14 and destroyed:
             self.tell(f"성역의 공급선 {destroyed}개를 끊어 드래곤의 체력이 약해졌습니다.", 4)
         if persist:
@@ -121,6 +126,8 @@ class Game:
                         weapon=data.get("weapon", 1))
         self.mode = data["phase"]
         self.gate_open = self.mode != "play"
+        if self.mode == "transit":
+            self.transit_progress, self.transit_x = 0.0, 560.0
         if self.mode != "play":
             self.combat.enemies = []
             self.combat.devices = []
@@ -196,16 +203,26 @@ class Game:
             return False
         levels = dict(p.upgrades)
         levels[key] += 1
-        hp = C.MAX_HP
-        self.load_stage(self.index + 1, levels, hp, weapon=p.weapon)
+        p.upgrades, p.hp = levels, C.MAX_HP
+        self.begin_transit()
         return True
 
     def skip_upgrade(self):
         if self.mode != "upgrade" or any(self.combat.player.upgrades[k] < C.UPGRADE_LIMIT for k in C.UPGRADES):
             return False
-        self.load_stage(self.index + 1, self.combat.player.upgrades, C.MAX_HP,
-                        weapon=self.combat.player.weapon)
+        self.combat.player.hp = C.MAX_HP
+        self.begin_transit()
         return True
+
+    def begin_transit(self):
+        self.mode = "transit"
+        self.transit_progress, self.transit_x = 0.0, 560.0
+        self.combat.enemies.clear()
+        self.combat.devices.clear()
+        self.combat.projectiles.clear()
+        self.combat.trail = None
+        self.combat.slashes.clear()
+        self.persist("transit")
 
     def enter_gate(self):
         if self.mode != "play" or not self.gate_open or self.training:
@@ -217,11 +234,25 @@ class Game:
             self.records["hits"] = max(self.records["hits"], self.combat.max_hits)
         self.combat.trail = None
         self.combat.slashes = []
-        self.mode = "victory" if self.index == len(self.stages) - 1 else "upgrade"
-        self.persist(self.mode)
+        if self.index == len(self.stages) - 1:
+            self.mode = "victory"
+            self.persist("victory")
+        elif self.index in (4, 9):
+            self.mode = "upgrade"
+            self.persist("upgrade")
+        else:
+            self.begin_transit()
         return True
 
     def update(self, dt, movement=Vec()):
+        if self.mode == "transit":
+            if movement.y > 0:
+                self.transit_progress = min(1.0, self.transit_progress + movement.y * 200 * dt / 230)
+                self.transit_x = max(475, min(645, self.transit_x + movement.x * 120 * dt))
+                if self.transit_progress >= 1:
+                    p = self.combat.player
+                    self.load_stage(self.index + 1, p.upgrades, C.MAX_HP, weapon=p.weapon)
+            return
         if self.paused or self.mode != "play":
             return
         self.toast_left = max(0, self.toast_left - dt)
