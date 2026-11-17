@@ -220,13 +220,19 @@ def main(argv=None):
                     pressed.discard(event.key)
                 elif event.type == pico.SDL_MOUSEMOTION:
                     mouse_pos = mouse_position(engine.window)
+                    game.pointer_pos = mouse_pos
                     if game.mode == "play" and not game.paused:
                         game.combat.aim_at(mouse_pos)
                 elif event.type == pico.SDL_MOUSEWHEEL:
-                    if game.mode == "play" and event.y:
+                    if game.mode == "play" and not game.paused and event.y:
                         game.cycle_item(1 if event.y < 0 else -1)
+                elif event.type == pico.SDL_MOUSEBUTTONUP:
+                    mouse_pos = mouse_position(engine.window)
+                    game.pointer_pos = mouse_pos
+                    renderer.release(game, mouse_pos, event.button)
                 elif event.type == pico.SDL_MOUSEBUTTONDOWN:
                     mouse_pos = mouse_position(engine.window)
+                    game.pointer_pos = mouse_pos
                     if game.mode == "play" and not game.paused:
                         game.combat.aim_at(mouse_pos)
                     if renderer.click(game, mouse_pos, event.button):
@@ -372,6 +378,7 @@ def main(argv=None):
                 game.combat.aim_at(mouse_pos)
             for event, _ in game.combat.events:
                 audio.play(event)
+            game.pointer_pos = mouse_pos
             renderer.consume(game.combat.events)
             renderer.draw(game)
             frames += 1

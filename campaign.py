@@ -12,6 +12,7 @@ from region_bosses import RegionBoss, FrozenGate
 from final_dragon import FinalDragon
 from enemy import Enemy
 from items import ITEMS, RECIPES, GEAR, name
+from quickbar import DEFAULT_SLOTS, LEGACY_SLOTS, ASSIGNABLE
 
 HUB_FACILITIES = (("forge", Vec(265, 465), "대장간"), ("storage", Vec(850, 355), "보관함"),
                   ("map", Vec(560, 110), "출발"))
@@ -33,6 +34,9 @@ class CampaignGame(LegacyGame):
         self.storage_open = False
         self.in_hub = False
         self._boss = None
+        self.quickslots = list(DEFAULT_SLOTS)
+        self.drag = None
+        self.pointer_pos = Vec()
 
     def snapshot(self, phase=None):
         phase = phase or self.mode
@@ -41,7 +45,8 @@ class CampaignGame(LegacyGame):
         return {"version": 2, "stage": self.index, "next_stage": self.next_stage, "phase": phase,
                 "hp": max(1, self.combat.player.hp), "weapon": self.combat.player.weapon,
                 "element": self.combat.element, "bag": dict(self.bag), "equipped": sorted(self.equipped),
-                "cleared": list(self.cleared), "collected": sorted(self.collected), "opened": sorted(self.opened)}
+                "cleared": list(self.cleared), "collected": sorted(self.collected), "opened": sorted(self.opened),
+                "quickslots": list(self.quickslots)}
 
     def persist(self, phase=None):
         if self.training or self.trial:
@@ -61,8 +66,10 @@ class CampaignGame(LegacyGame):
         self.owned_elements = [e for e in ("ice", "fire") if self.bag.get(e + "_stone")]
         self.combat.element = data.get("element")
         self.next_stage = data["next_stage"]
+        self.quickslots = list(data.get("quickslots", LEGACY_SLOTS))
 
     def new_game(self):
+        self.quickslots = list(DEFAULT_SLOTS)
         self.training = self.trial = False
         self.bag = {"healing_potion": 2}
         self.equipped, self.collected, self.opened = set(), set(), set()
@@ -151,11 +158,22 @@ class CampaignGame(LegacyGame):
         return True
 
     def select_item(self, slot):
+        if not 0 <= slot < 5 or not self.quickslots[slot]:
+            return False
+        token = self.quickslots[slot]
+        if not self.can_use_shortcut(token):
+            self.tell("소지하지 않은 아이템입니다.")
+            return False
+        if token.startswith('weapon:'):
+            return self.select_weapon(int(token.split(':')[1]))
+        key = token.split(':')[1]
+        if key == 'healing_potion':
+            return self.use_potion()
+        return self.equip_element(key.removesuffix('_stone'))
+
+    def equip_element(self, element):
         if self.mode not in ("play", "hub", "forge", "map") or (self.paused and not self.inventory_open):
             return False
-        if slot < 3:
-            return self.select_weapon(slot + 1)
-        element = {3: "ice", 4: "fire"}.get(slot)
         if element not in self.owned_elements:
             self.tell("대장간에서 원소석을 먼저 합성하세요.")
             return False
@@ -163,10 +181,59 @@ class CampaignGame(LegacyGame):
         self.persist()
         return True
 
+    def can_use_shortcut(self, token):
+        if not token:
+            return False
+        kind, key = token.split(':')
+        return int(key) in self.available_weapons(self.index) if kind == 'weapon' else self.bag.get(key, 0) > 0
+
+    def active_shortcut(self):
+        return 'item:' + self.combat.element + '_stone' if self.combat.element else 'weapon:' + str(self.combat.player.weapon)
+
+    def cycle_item(self, step):
+        slots = [i for i, token in enumerate(self.quickslots) if self.can_use_shortcut(token) and token != 'item:healing_potion']
+        if not slots:
+            return False
+        current = next((i for i in slots if self.quickslots[i] == self.active_shortcut()), None)
+        return self.select_item(slots[(slots.index(current) + step) % len(slots)] if current is not None else slots[0])
+
+    def begin_drag(self, token, source=None):
+        if not self.inventory_open or token not in ASSIGNABLE or not self.can_use_shortcut(token):
+            self.tell("검·원소석·회복약을 숫자 슬롯에 등록할 수 있습니다.")
+            return False
+        self.drag = {'token': token, 'source': source}
+        return True
+
+    def drop_shortcut(self, target):
+        drag, self.drag = self.drag, None
+        if not drag or target is None or not 0 <= target < 5 or not self.inventory_open:
+            return False
+        token, source = drag['token'], drag['source']
+        if not self.can_use_shortcut(token):
+            return False
+        if source is None:
+            source = next((i for i, value in enumerate(self.quickslots) if value == token), None)
+        if source is not None:
+            self.quickslots[source], self.quickslots[target] = self.quickslots[target], token
+        else:
+            self.quickslots[target] = token
+        self.persist()
+        return True
+
+    def use_potion(self):
+        if self.combat.player.hp >= C.MAX_HP or not self.bag.get('healing_potion'):
+            return False
+        self.bag['healing_potion'] -= 1
+        self.combat.player.hp = min(C.MAX_HP, self.combat.player.hp + 2)
+        self.tell("회복약 사용 · 체력 +2")
+        self.persist()
+        return True
+
     def toggle_inventory(self):
         if self.mode not in ("play", "hub") or (self.paused and not self.inventory_open):
             return
         self.inventory_open = not self.inventory_open
+        self.drag = None
         self.paused = self.inventory_open
         if not self.inventory_open:
             self.storage_open = False
@@ -183,7 +250,7 @@ class CampaignGame(LegacyGame):
         if kind == "weapon":
             return self.select_weapon(int(key))
         if key.endswith("_stone"):
-            return self.select_item(3 if key == "ice_stone" else 4)
+            return self.equip_element(key.removesuffix('_stone'))
         if key in GEAR:
             if key in self.equipped:
                 self.equipped.remove(key)
@@ -191,10 +258,8 @@ class CampaignGame(LegacyGame):
                 self.equipped.add(key)
             self._apply_gear()
             self.tell(name(key) + (" 착용" if key in self.equipped else " 해제"))
-        elif key == "healing_potion" and self.combat.player.hp < C.MAX_HP:
-            self.bag[key] -= 1
-            self.combat.player.hp = min(C.MAX_HP, self.combat.player.hp + 2)
-            self.tell("회복약 사용 · 체력 +2")
+        elif key == "healing_potion":
+            return self.use_potion()
         self.persist()
 
     def enter_hub(self):
@@ -352,6 +417,7 @@ class CampaignGame(LegacyGame):
     def start_trial(self, index):
         if not 0 <= index < len(self.stages):
             return False
+        self.quickslots = list(LEGACY_SLOTS)
         self.trial, self.training = True, False
         self.bag, self.equipped, self.collected, self.opened = {"healing_potion": 3, "arrow_bundle": 80}, set(), set(), set()
         self.cleared = list(range(index))

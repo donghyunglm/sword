@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from items import ITEMS, GEAR
+from quickbar import ASSIGNABLE
 
 DEFAULT_PATH = Path(__file__).resolve().parent / "saves/campaign_progress.json"
 
@@ -17,6 +18,11 @@ def validate(data):
     if data.get("phase") not in ("hub", "play", "transit", "victory"):
         raise ValueError("장면 정보가 올바르지 않습니다.")
     bag = data.get("bag")
+    slots = data.get('quickslots')
+    if slots is not None and (not isinstance(slots, list) or len(slots) != 5
+                              or any(token is not None and token not in ASSIGNABLE for token in slots)
+                              or len([s for s in slots if s]) != len(set(s for s in slots if s))):
+        raise ValueError("숫자 슬롯 정보가 올바르지 않습니다.")
     if not isinstance(bag, dict) or any(k not in ITEMS or type(v) is not int or not 0 <= v <= 9999 for k, v in bag.items()):
         raise ValueError("소지품 정보가 올바르지 않습니다.")
     equipped = data.get("equipped", [])

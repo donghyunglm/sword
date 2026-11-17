@@ -5,6 +5,7 @@ from geometry import Vec
 from campaign import HUB_FACILITIES
 from campaign_data import REGIONS
 from items import RECIPES, ITEMS, name
+from quickbar import slot_at, entry_position
 
 
 class CampaignRenderer(Renderer):
@@ -106,29 +107,88 @@ class CampaignRenderer(Renderer):
         self.center('출발하기', 155, 26, CYAN)
         self.center('1~4 지역 선택 · Esc 거점으로', 65, 18)
 
+    def shortcut_image(self, token, x, y, size=40):
+        if not token: return
+        kind, key = token.split(':')
+        if kind == 'weapon':
+            self.ui({'1': 'weapon_basic', '2': 'weapon_frost', '3': 'weapon_shatter'}[key], x, y, size, size)
+        else:
+            self.image(key, x, y, size, size)
+
+    def item_bar(self, game):
+        rect(32, 575, 294, 66, INK, 235)
+        target = slot_at(game.pointer_pos) if game.drag else None
+        for slot, token in enumerate(game.quickslots):
+            x = 64 + slot * 58
+            owned = game.can_use_shortcut(token)
+            selected = token is not None and token == game.active_shortcut()
+            self.ui('slot_selected' if selected or slot == target else 'slot_normal', x, 608, 54, 54)
+            if token:
+                if owned: self.shortcut_image(token, x + 2, 600, 30)
+                else: self.ui('slot_locked', x + 2, 600, 30, 30)
+            rect(x - 18, 612, 14, 13, INK, 255)
+            self.text(str(slot + 1), x - 15, 618, 14, GOLD if selected else WHITE)
+            if token == 'item:healing_potion':
+                self.text(str(game.bag.get('healing_potion', 0)), x + 9, 592, 14, GOLD)
+
     def inventory(self, game):
         self.shade()
-        rect(70, 115, 980, 535, INK)
-        self.center('보관함 / 인벤토리 · 클릭으로 장착 또는 사용', 610, 26, GOLD)
+        rect(70, 110, 980, 445, INK)
+        self.item_bar(game)
+        self.text('아이템을 집어서 1~5 슬롯에 놓으세요', 355, 608, 23, GOLD)
+        self.center('보관함 / 인벤토리', 523, 26, GOLD)
         for i, (kind, key) in enumerate(game.inventory_entries()):
-            x, y = 155 + (i % 6) * 145, 505 - (i // 6) * 120
+            pos = entry_position(i)
+            x, y = pos.x, pos.y
             rect(x - 52, y - 40, 104, 90, CYAN if i == game.inventory_selected else MUTED, 80)
-            if kind == 'item':
-                self.image(key, x, y + 5, 64, 64)
-                label = name(key) + ' ' + str(game.bag[key])
-            else:
-                self.ui('weapon_' + key, x, y, 60, 60)
-                label = '검 ' + key
+            self.shortcut_image(kind + ':' + key, x, y + 5, 64)
+            label = name(key) + ' ' + str(game.bag[key]) if kind == 'item' else {'1': '기본 검', '2': '냉기 검', '3': '파쇄 검'}[key]
             self.text(label, x - 55, y - 58, 14, GOLD)
-        self.center('I / Esc 닫기 · 장비는 다시 클릭하면 해제', 145, 18)
+        self.center('I / Esc 닫기 · 슬롯끼리 드래그하면 교환 · 슬롯 우클릭은 등록 해제', 145, 16)
+        self.center('장비는 클릭해 착용 · 재료는 대장간에서 합성', 115, 16, MUTED)
+        if game.drag:
+            pos = game.pointer_pos
+            self.ui('slot_selected', pos.x, pos.y, 60, 60)
+            self.shortcut_image(game.drag['token'], pos.x, pos.y, 45)
+        if game.toast_left > 0: self.center(game.toast, 85, 16, GOLD)
+
+    def release(self, game, pos, button):
+        if not game.inventory_open or button != 1: return False
+        if game.drag:
+            source = game.drag.get('entry')
+            start = game.drag.get('start', pos)
+            if source is not None and start.distance(pos) < 5 and slot_at(pos) is None:
+                game.drag = None
+                entry = game.inventory_entries()[source]
+                if entry[0] == 'item' and entry[1] not in ('ice_stone', 'fire_stone'):
+                    game.use_inventory(source)
+            else:
+                game.drop_shortcut(slot_at(pos))
+        return True
 
     def click(self, game, pos, button):
-        if button != 1: return False
         if game.inventory_open:
-            for i in range(len(game.inventory_entries())):
-                x, y = 155 + i % 6 * 145, 505 - i // 6 * 120
-                if abs(pos.x - x) < 55 and abs(pos.y - y) < 55: game.use_inventory(i)
+            slot = slot_at(pos)
+            if button == 3 and slot is not None:
+                game.quickslots[slot] = None
+                game.persist()
+                return True
+            if button != 1: return True
+            if slot is not None:
+                if game.begin_drag(game.quickslots[slot], slot): game.drag['start'] = pos
+                return True
+            for i, entry in enumerate(game.inventory_entries()):
+                point = entry_position(i)
+                if abs(pos.x - point.x) < 55 and abs(pos.y - point.y) < 55:
+                    game.inventory_selected = i
+                    token = entry[0] + ':' + entry[1]
+                    if game.begin_drag(token):
+                        game.drag.update(entry=i, start=pos)
+                    elif entry[0] == 'item' and entry[1] in ('heatproof_gloves', 'fur_leather_coat', 'magic_resist_amulet'):
+                        game.use_inventory(i)
+                    return True
             return True
+        if button != 1: return False
         if game.mode == 'hub':
             for key, point, _ in HUB_FACILITIES:
                 if pos.distance(point) < 95: game.open_facility(key)

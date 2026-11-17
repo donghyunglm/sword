@@ -574,7 +574,7 @@ class Renderer:
                 line(cursor + Vec(0, -12), cursor + Vec(0, -4), CYAN, 190)
                 line(cursor + Vec(0, 4), cursor + Vec(0, 12), CYAN, 190)
 
-    def hud(self, game):
+    def item_bar(self, game):
         c, player = game.combat, game.combat.player
         rect(32, 575, 294, 66, INK, 210)
         for slot in range(5):
@@ -589,6 +589,10 @@ class Renderer:
                     self.bank.draw_cell(("ice" if slot == 3 else "fire") + "_relic_test", 0, 0, Vec(x, 608), 72, 48)
             rect(x - 17, 609, 17, 17, (9, 17, 27), 245)
             self.text(str(slot + 1), x - 13, 617, 14, GOLD if selected else WHITE)
+
+    def hud(self, game):
+        c, player = game.combat, game.combat.player
+        self.item_bar(game)
         rect(0, 654, C.WIDTH, 106, (9, 17, 27), 245)
         rect(0, 652, C.WIDTH, 2, (68, 98, 107))
         self.text("HP", 32, 722, 16, MUTED)
