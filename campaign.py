@@ -28,7 +28,7 @@ class CampaignGame(LegacyGame):
         self.collected, self.opened = set(), set()
         self.next_stage = 0
         self.recipe_index = self.map_region = self.inventory_selected = 0
-        self.forge_flash = 0.0
+        selfㅇ.forge_flash = 0.0
         self.corpses, self.drops, self.chests = [], [], []
         self.frozen_gate = None
         self.storage_open = False
