@@ -17,6 +17,7 @@ class Enemy:
     projectile_request: bool = False
     cast_left: float = 0
     slow_left: float = 0
+    freeze_left: float = 0
 
     @classmethod
     def make(cls, uid, kind, pos):
@@ -27,10 +28,13 @@ class Enemy:
 
     def update(self, dt, player, arena, others=()):
         self.flash = max(0, self.flash - dt)
+        if self.freeze_left > 0:
+            self.freeze_left = max(0, self.freeze_left - dt)
+            return
         self.attack_wait = max(0, self.attack_wait - dt)
         self.cast_left = max(0, self.cast_left - dt)
         self.slow_left = max(0, self.slow_left - dt)
-        slow = 0.55 if self.slow_left > 0 else 1.0
+        slow = 0.35 if self.slow_left > 0 else 1.0
         delta = player.pos - self.pos
 
         if self.kind == "mage":

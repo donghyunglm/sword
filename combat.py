@@ -8,14 +8,19 @@ from enemy import Enemy
 from device import Device
 from projectile import Projectile
 from types import SimpleNamespace
+from element_skill import ElementSkill
+from final_dragon import FinalDragon
 
 
 class Combat:
-    def __init__(self, arena=None, player=None, dual_mode=False, purification=True, seal_break=False):
+    def __init__(self, arena=None, player=None, dual_mode=False, purification=True, seal_break=False,
+                 auto_echo=False):
         self.arena = arena or Arena()
         self.player = player or Player()
         self.trail = None
         self.dual_mode = dual_mode
+        self.auto_echo = auto_echo
+        self.auto_echo_timer = None
         self.purification = purification
         self.seal_break = seal_break
         self.echo_pos = None
@@ -32,11 +37,54 @@ class Combat:
         self.last_hits = 0
         self.uid = 0
         self.defend_pos = None
+        self.element = None
+        self.element_skill = ElementSkill()
+        self.aim_target = None
+        self.dash_direction = None
+        self.parry_left = self.parry_cooldown = 0.0
+        self.counter_left = 0.0
+        self.counter_charges = 0
+        self.counter_element = None
+        self.backstab_ready = False
+
+    @property
+    def counter_active(self):
+        return self.counter_left > 0 and self.counter_charges > 0
+
+    @property
+    def skill_element(self):
+        if self.counter_active:
+            return self.counter_element
+        return self.element
+
+    def parry(self):
+        if (not any(isinstance(e, FinalDragon) for e in self.enemies) or self.player.hp <= 0
+                or self.player.dash_left or self.parry_cooldown > 0):
+            return False
+        self.parry_left, self.parry_cooldown = 0.18, 0.75
+        self.events.append(("parry_ready", self.player.pos))
+        return True
+
+    def hit_enemy(self, enemy, element, origin, direct=False):
+        if not isinstance(enemy, FinalDragon):
+            return enemy.receive_slash()
+        old_shield = enemy.shield_hp
+        landed = enemy.receive_attack(element or "soul")
+        if old_shield > enemy.shield_hp:
+            self.events.append(("shield_break" if enemy.shield_hp == 0 else "shield_hit", enemy.pos))
+        if (landed and direct and self.backstab_ready and self.counter_left > 0
+                and enemy.state == "stunned"):
+            offset = (origin - enemy.pos).normalized()
+            if offset.x * enemy.direction.x + offset.y * enemy.direction.y < -0.3:
+                enemy.hp -= 3
+                self.backstab_ready = False
+                self.events.append(("backstab", enemy.pos))
+        return landed
 
     @property
     def ready(self):
         p = self.player
-        return (p.hp > 0 and not p.dash_left and p.cooldown <= 0
+        return (p.hp > 0 and not p.dash_left and (p.cooldown <= 0 or self.counter_active)
                 and (self.echo_pos is None if self.dual_mode else self.trail is None)
                 and not any(not s.resolved for s in self.slashes))
 
@@ -52,19 +100,32 @@ class Combat:
         self.devices.append(device)
         return device
 
-    def dash(self):
+    def dash(self, direction=None):
         if not self.ready:
             return False
         p = self.player
+        if self.counter_active:
+            p.cooldown = 0
+        self.dash_direction = (direction if direction is not None and direction.length() else p.facing).normalized()
         p.dash_left = C.DASH_TIME
         if self.dual_mode:
             self.echo_pos, self.echo_remaining = p.pos, p.trail_lifetime
         else:
-            self.trail = Trail(p.pos, p.facing, p.trail_lifetime)
+            self.trail = Trail(p.pos, self.dash_direction, max(3.0, p.trail_lifetime) if self.skill_element else p.trail_lifetime,
+                               self.skill_element, p.weapon)
         self.events.append(("dash", p.pos))
         return True
 
     def slash(self):
+        if self.auto_echo or self.element or self.counter_left > 0:
+            if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
+                    or any(not s.resolved and s.style == "direct" for s in self.slashes)):
+                return False
+            self.slashes.append(Slash([self.player.pos], self.player.facing.normalized(),
+                                      55 + self.player.upgrades["range"] * 7,
+                                      style="direct", weapon=self.player.weapon))
+            self.events.append(("slash", self.player.pos))
+            return True
         if self.dual_mode:
             if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
                     or any(not s.resolved for s in self.slashes)):
@@ -75,7 +136,7 @@ class Combat:
             boosted = len(points) > 1
             self.slashes.append(Slash(points, self.player.facing.normalized(),
                                       55 + self.player.upgrades["range"] * 7,
-                                      boosted, style="dual", weapon=self.player.weapon))
+                                      boosted, style="dual", weapon=self.player.weapon, element=self.element))
             self.echo_pos, self.echo_remaining = None, 0
             self.events.append(("slash", self.player.pos))
             return True
@@ -84,7 +145,7 @@ class Combat:
         if self.trail is None:
             self.slashes.append(Slash([self.player.pos], self.player.facing.normalized(),
                                       55 + self.player.upgrades["range"] * 7, style="direct",
-                                      weapon=self.player.weapon))
+                                      weapon=self.player.weapon, element=self.element))
             self.events.append(("slash", self.player.pos))
             return True
         t = self.trail
@@ -95,11 +156,26 @@ class Combat:
             points.append(t.points[-1])
         self.slashes.append(Slash(points, t.direction,
                                   self.player.slash_radius * (1.3 if self.prism else 1),
-                                  self.prism, style="chain", weapon=self.player.weapon))
+                                  self.prism, style="chain", weapon=self.player.weapon,
+                                  element=t.element))
         self.prism = False
         self.trail = None
         self.events.append(("slash", self.player.pos))
         return True
+
+    def release_auto_echo(self):
+        if not self.trail:
+            return
+        trail = self.trail
+        stride = max(1, (len(trail.points) - 1) // 7)
+        points = trail.points[::stride]
+        if points[-1] != trail.points[-1]:
+            points.append(trail.points[-1])
+        self.slashes.append(Slash(points, trail.direction, self.player.slash_radius,
+                                  style="chain", weapon=trail.weapon, element=trail.element))
+        self.trail = None
+        self.auto_echo_timer = None
+        self.events.append(("slash", points[0]))
 
     def resolve(self, slash):
         hits, dead, weak = 0, 0, False
@@ -119,16 +195,25 @@ class Combat:
         # 대상 객체당 한 번만 검사하므로 여러 경로 점에 겹쳐도 중복 피해가 없다.
         for enemy in self.enemies:
             boss_target = enemy.kind in ("guardian", "knight", "dragon")
-            chain_boss = boss_target and slash.style == "chain"
+            chain_boss = boss_target and slash.style == "chain" and not isinstance(enemy, FinalDragon)
             if (enemy.hp <= 0 or (enemy.uid in slash.hit_ids and not chain_boss)
                     or not touches(enemy.pos, enemy.radius)):
                 continue
-            if slash.weapon == 2 and enemy.uid not in slash.frost_ids:
+            if slash.weapon == 2 and enemy.uid not in slash.frost_ids and not isinstance(enemy, FinalDragon):
                 if boss_target:
                     if enemy.state in ("approach", "tell"):
-                        enemy.timer += 0.22
+                        enemy.timer += 0.45
                 else:
-                    enemy.slow_left = max(enemy.slow_left, 1.5)
+                    enemy.freeze_left = max(enemy.freeze_left, 0.55)
+                    enemy.slow_left = max(enemy.slow_left, 2.2)
+                    # 한 마리를 베더라도 근처의 무리를 묶어 대시 경로를 다시 설계할 시간을 준다.
+                    for nearby in self.enemies:
+                        if (nearby.uid != enemy.uid and nearby.hp > 0
+                                and nearby.kind not in ("guardian", "knight", "dragon")
+                                and nearby.pos.distance(enemy.pos) <= 105):
+                            nearby.freeze_left = max(nearby.freeze_left, 0.55)
+                            nearby.slow_left = max(nearby.slow_left, 2.2)
+                            self.events.append(("frost", nearby.pos))
                 slash.frost_ids.add(enemy.uid)
                 self.events.append(("frost", enemy.pos))
             landed = False
@@ -137,9 +222,10 @@ class Combat:
                 enemy.flash = 0.14
                 landed = True
             elif enemy.uid not in slash.hit_ids:
-                landed = enemy.receive_slash()
+                element = slash.element or ("ice" if slash.weapon == 2 else "soul")
+                landed = self.hit_enemy(enemy, element, slash.points[0], slash.style == "direct")
             if landed:
-                if slash.weapon == 3 and enemy.uid not in slash.hit_ids:
+                if slash.weapon == 3 and enemy.uid not in slash.hit_ids and not isinstance(enemy, FinalDragon):
                     if boss_target or enemy.kind in ("boar", "sentinel"):
                         enemy.hp -= 1
                 slash.hit_ids.add(enemy.uid)
@@ -199,6 +285,8 @@ class Combat:
         self.max_hits = max(self.max_hits, hits)
         self.player.cooldown = (0.12 if slash.boosted else 0.34) if slash.style == "dual" else (
             0 if hits >= 2 or slash.boosted else C.SINGLE_COOLDOWN if hits else C.MISS_COOLDOWN)
+        if self.auto_echo and slash.style == "direct":
+            self.player.cooldown = 0 if hits >= 2 else 0.20 if hits else 0.27
         if slash.weapon == 3:
             self.player.cooldown = max(self.player.cooldown, 0.70)
         if hits >= 2 or slash.boosted:
@@ -209,12 +297,19 @@ class Combat:
     def update(self, dt, movement=Vec()):
         self.elapsed += dt
         p = self.player
+        if self.aim_target is not None and (self.aim_target - p.pos).length():
+            p.facing = (self.aim_target - p.pos).normalized()
         p.cooldown = max(0, p.cooldown - dt)
+        self.parry_cooldown = max(0, self.parry_cooldown - dt)
+        self.counter_left = max(0, self.counter_left - dt)
+        if self.counter_left == 0:
+            self.counter_charges = 0
+            self.backstab_ready = False
         p.invulnerable = max(0, p.invulnerable - dt)
         p.moving = movement.length() > 0 or p.dash_left > 0
         if p.dash_left > 0:
             active = min(dt, p.dash_left)
-            p.pos, blocked = self.arena.move(p.pos, p.facing * (C.DASH_SPEED * active), p.radius, False)
+            p.pos, blocked = self.arena.move(p.pos, (self.dash_direction or p.facing) * (C.DASH_SPEED * active), p.radius, False)
             if self.trail:
                 self.trail.record(p.pos)
             p.dash_left = max(0, p.dash_left - dt)
@@ -222,16 +317,24 @@ class Combat:
                 p.dash_left = 0
             if p.dash_left == 0 and self.trail:
                 self.trail.finish()
+                if self.auto_echo and not self.skill_element:
+                    self.auto_echo_timer = 0.35
         else:
             if movement.length():
-                p.facing = movement.normalized()
-                p.pos, _ = self.arena.move(p.pos, p.facing * (p.speed * dt), p.radius)
+                if self.aim_target is None:
+                    p.facing = movement.normalized()
+                p.pos, _ = self.arena.move(p.pos, movement.normalized() * (p.speed * dt), p.radius)
             if self.trail:
-                self.trail.remaining -= dt
-                if self.trail.remaining <= 0:
-                    self.trail = None
-                    p.cooldown = C.MISS_COOLDOWN
-                    self.events.append(("expire", p.pos))
+                if self.auto_echo and self.auto_echo_timer is not None:
+                    self.auto_echo_timer -= dt
+                    if self.auto_echo_timer <= 0:
+                        self.release_auto_echo()
+                if self.trail:
+                    self.trail.remaining -= dt
+                    if self.trail.remaining <= 0:
+                        self.trail = None
+                        p.cooldown = C.MISS_COOLDOWN
+                        self.events.append(("expire", p.pos))
             if self.dual_mode and self.echo_pos is not None:
                 self.echo_remaining = max(0, self.echo_remaining - dt)
                 if self.echo_remaining == 0:
@@ -253,6 +356,7 @@ class Combat:
                                                    kind=enemy.kind))
                 enemy.projectile_request = False
         self.projectiles = [b for b in self.projectiles if b.update(dt, self.arena)]
+        self.element_skill.update(dt, self)
         for device in self.devices:
             device.flash = max(0, device.flash - dt)
         for slash in self.slashes:
@@ -274,12 +378,29 @@ class Combat:
                 self.resolve(slash)
         self.slashes = [s for s in self.slashes if s.alive]
         for enemy in self.enemies:
+            if (isinstance(enemy, FinalDragon) and enemy.state == "charge" and self.parry_left > 0
+                    and p.dash_left <= 0 and p.pos.distance(enemy.pos) <= p.radius + enemy.radius + 8):
+                self.counter_element = enemy.shield_element
+                enemy.break_shield(parried=True)
+                enemy.pos, _ = self.arena.move(enemy.pos, enemy.direction * -32, enemy.radius)
+                self.counter_left, self.counter_charges = 2.0, 2
+                self.backstab_ready = True
+                self.parry_left = 0
+                p.cooldown = 0
+                p.invulnerable = max(p.invulnerable, 0.3)
+                self.element_skill.cooldown = 0
+                self.trail = None
+                self.events.append(("parry_success", enemy.pos))
+                continue
+            if isinstance(enemy, FinalDragon) and enemy.state == "stunned":
+                continue
             if p.pos.distance(enemy.pos) < p.radius + enemy.radius and p.hurt():
                 self.events.append(("hurt", p.pos))
                 knock = (p.pos - enemy.pos).normalized() * 35
                 p.pos, _ = self.arena.move(p.pos, knock, p.radius)
             if getattr(enemy, "kind", "") == "dragon" and enemy.threatens(p.pos) and p.hurt():
                 self.events.append(("hurt", p.pos))
+        self.parry_left = max(0, self.parry_left - dt)
         for bullet in self.projectiles[:]:
             if p.pos.distance(bullet.pos) < p.radius + bullet.radius:
                 if p.hurt():

@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from game import Game
 from geometry import Vec, path_hits
+from final_dragon import FinalDragon
 
 
 def steer(arena, pos, desired, radius=14):
@@ -81,7 +82,19 @@ def run(start=0):
             target = min(wolves or c.enemies, key=lambda e: e.pos.distance(player.pos))
             delta = target.pos - player.pos
             distance = delta.length()
-            if target.kind == "dragon":
+            if isinstance(target, FinalDragon):
+                # 기본 속성 방어막을 검격으로 깎고, 몸통 돌진은 F 패링 동작으로 대응한다.
+                player.facing = delta.normalized()
+                if target.state == "charge" and distance < 110:
+                    c.parry()
+                if target.state == "attack":
+                    perpendicular = Vec(-target.direction.y, target.direction.x)
+                    direction = steer(c.arena, player.pos, perpendicular)
+                else:
+                    direction = steer(c.arena, player.pos, delta.normalized() if distance > 92 else delta.normalized() * -1 if distance < 80 else Vec())
+                if distance < 108 and not player.dash_left:
+                    c.slash()
+            elif target.kind == "dragon":
                 if target.state == "tell" and target.timer < 0.14 and c.ready and distance < 95:
                     player.facing = Vec(-target.direction.y, target.direction.x)
                     c.dash()

@@ -19,8 +19,8 @@ class GameTests(unittest.TestCase):
         self.path = Path(self.tmp.name) / "progress.json"
         self.game = Game(self.path)
 
-    def test_stage_data_has_fifteen_valid_rounds(self):
-        self.assertEqual(len(load_stages()), 15)
+    def test_stage_data_has_sixteen_valid_rounds(self):
+        self.assertEqual(len(load_stages()), 16)
 
     def test_pause_freezes_all_combat_timers(self):
         g = self.game
@@ -66,7 +66,7 @@ class GameTests(unittest.TestCase):
         self.assertEqual(sum(continued.combat.player.upgrades.values()), 0)
         self.assertEqual(continued.combat.kills, 0)
 
-    def test_fifteenth_round_finishes_campaign_without_loop(self):
+    def test_sixteenth_round_finishes_campaign_without_loop(self):
         g = self.game
         g.new_game()
         for i in range(15):
@@ -78,8 +78,15 @@ class GameTests(unittest.TestCase):
                     g.choose_upgrade(i % 3)
                 self.assertEqual(g.mode, "transit")
                 g.update(1.3, Vec(0, 1))
+        g.update(1.3, Vec(0, 1))
+        self.assertEqual(g.index, 15)
+        self.assertEqual(g.mode, "play")
+        self.assertEqual(g.combat.enemies[0].kind, "dragon")
+        g.gate_open = True
+        g.enter_gate()
         self.assertEqual(g.mode, "victory")
-        self.assertEqual(g.index, 14)
+        self.assertEqual(g.saved["phase"], "victory", g.notice)
+        self.assertEqual(g.index, 15)
         restored = Game(self.path)
         restored.continue_game()
         self.assertEqual(restored.mode, "victory")
@@ -135,11 +142,65 @@ class GameTests(unittest.TestCase):
         self.assertEqual(sum(g.combat.player.upgrades.values()), 9)
         g.gate_open = True
         g.enter_gate()
-        self.assertEqual(g.mode, "victory")
+        self.assertEqual(g.mode, "transit")
+        g.update(1.3, Vec(0, 1))
+        self.assertEqual(g.mode, "play")
         self.assertEqual(self.path.read_bytes(), original)
         g.exit_to_title()
         self.assertTrue(g.continue_game())
         self.assertEqual(g.stage["id"], "1-1")
+
+    def test_final_round_element_pickup_keeps_existing_trail_color(self):
+        g = self.game
+        g.load_stage(14, persist=False)
+        self.assertFalse(g.pickup_element())
+        g.load_stage(15, persist=False)
+        g.combat.player.pos = g.element_drops[0][1]
+        self.assertTrue(g.pickup_element())
+        self.assertEqual(g.combat.element, "ice")
+        self.assertTrue(g.combat.dash())
+        self.assertEqual(g.combat.trail.element, "ice")
+        g.combat.player.pos = g.element_drops[0][1]
+        self.assertTrue(g.pickup_element())
+        self.assertEqual(g.combat.element, "fire")
+        self.assertEqual(g.combat.trail.element, "ice")
+        g.combat.player.dash_left = 0
+        self.assertTrue(g.combat.slash())
+        self.assertEqual(g.combat.slashes[-1].style, "direct")
+        self.assertIsNone(g.combat.slashes[-1].element)
+        self.assertEqual(g.combat.trail.element, "ice")
+
+    def test_owned_elements_restore_and_inventory_switches_to_sword(self):
+        g = self.game
+        g.load_stage(15)
+        g.combat.player.pos = g.element_drops[0][1]
+        self.assertTrue(g.pickup_element())
+        restored = Game(self.path)
+        self.assertTrue(restored.continue_game())
+        self.assertEqual(restored.owned_elements, ["ice"])
+        self.assertEqual(restored.combat.element, "ice")
+        self.assertTrue(restored.select_item(0))
+        self.assertIsNone(restored.combat.element)
+        self.assertFalse(restored.select_item(4))
+        self.assertTrue(restored.select_item(3))
+
+    def test_inventory_pauses_combat_and_wheel_skips_unowned_slots(self):
+        g = self.game
+        g.load_stage(0, persist=False)
+        g.toggle_inventory()
+        self.assertTrue(g.paused)
+        elapsed = g.combat.elapsed
+        g.update(1, Vec(1, 0))
+        self.assertEqual(g.combat.elapsed, elapsed)
+        self.assertTrue(g.cycle_item(1))
+        self.assertEqual(g.combat.player.weapon, 1)
+        g.owned_elements = ["fire"]
+        g.cycle_item(1)
+        self.assertEqual(g.combat.element, "fire")
+        g.cycle_item(-1)
+        self.assertIsNone(g.combat.element)
+        g.toggle_inventory()
+        self.assertFalse(g.paused)
 
     def test_campaign_actions_change_later_fights(self):
         g = self.game

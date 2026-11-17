@@ -12,6 +12,9 @@ class Audio:
         self.sounds = {}
         directory = Path(__file__).resolve().parent / ".cache" / "sounds"
         tones = {"dash": (520, 220, 0.08), "slash": (850, 190, 0.10),
+                 "parry_success": (1600, 700, 0.18), "parry_ready": (680, 1000, 0.06),
+                 "shield_break": (1200, 140, 0.24), "shield_hit": (1000, 650, 0.07),
+                 "backstab": (900, 90, 0.16),
                  "chain_hit": (720, 420, 0.055),
                  "production": (160, 360, 0.16),
                  "beacon_hit": (210, 90, 0.14),

@@ -17,6 +17,18 @@ class CombatTests(unittest.TestCase):
         self.tick(b, 0.3, Vec(1, 1))
         self.assertAlmostEqual(a.player.pos.distance(origin), b.player.pos.distance(origin))
 
+    def test_mouse_aim_is_independent_of_walk_and_dash_direction(self):
+        c = Combat()
+        c.aim_target = c.player.pos + Vec(500, 0)
+        self.tick(c, 0.1, Vec(0, 1))
+        self.assertGreater(c.player.facing.x, 0.9)
+        origin = c.player.pos
+        self.assertTrue(c.dash(Vec(0, -1)))
+        self.tick(c, 0.19)
+        self.assertAlmostEqual(c.player.pos.x, origin.x)
+        self.assertLess(c.player.pos.y, origin.y)
+        self.assertGreater(c.player.facing.x, 0.9)
+
     def test_dash_does_no_damage_and_cannot_stack_paths(self):
         c = Combat()
         c.spawn("wolf", Vec(560, 270))
@@ -26,6 +38,20 @@ class CombatTests(unittest.TestCase):
         self.assertEqual(c.enemies[0].hp, 1)
         self.assertFalse(c.dash())
         self.assertLess(c.trail.points[0].y, c.trail.points[-1].y)
+
+    def test_auto_echo_mode_keeps_j_direct_and_releases_dash_trail(self):
+        c = Combat(auto_echo=True)
+        self.assertTrue(c.slash())
+        self.assertEqual(c.slashes[-1].style, "direct")
+        d = Combat(auto_echo=True)
+        self.assertTrue(d.dash())
+        self.tick(d, 0.2)
+        self.assertIsNotNone(d.trail)
+        self.assertTrue(d.slash())
+        self.assertEqual(d.slashes[-1].style, "direct")
+        self.tick(d, 0.38)
+        self.assertIsNone(d.trail)
+        self.assertTrue(any(s.style == "chain" for s in d.slashes))
 
     def test_multi_hit_is_counted_per_enemy_and_recharges(self):
         c = Combat()
@@ -126,10 +152,15 @@ class CombatTests(unittest.TestCase):
         c = Combat()
         c.player.weapon = 2
         boar = c.spawn("boar", Vec(560, 240))
+        nearby = c.spawn("boar", Vec(650, 240))
         c.slash()
         self.tick(c, 0.08)
-        self.assertGreater(boar.slow_left, 1.3)
+        self.assertGreater(boar.slow_left, 2)
+        self.assertGreater(nearby.freeze_left, 0)
         self.assertEqual(boar.hp, 1)
+        frozen_pos = nearby.pos
+        self.tick(c, 0.2)
+        self.assertEqual(nearby.pos, frozen_pos)
 
     def test_shatter_breaks_armored_enemy_but_recovers_slowly(self):
         c = Combat()

@@ -8,6 +8,7 @@ from late_bosses import Knight, Dragon
 from stage import load_stages, make_arena
 from save_data import read_save, write_save, DEFAULT_PATH
 from projectile import Projectile
+from final_dragon import FinalDragon
 
 
 class Game:
@@ -23,6 +24,7 @@ class Game:
         self.trial = False
         self.selected_stage = 0
         self.paused = False
+        self.inventory_open = False
         self.wave_index = 0
         self.gate_open = False
         self.toast, self.toast_left = "", 0
@@ -42,6 +44,8 @@ class Game:
         self.remote_shots = 0
         self.transit_progress = 0.0
         self.transit_x = 560.0
+        self.element_drops = []
+        self.owned_elements = []
 
     @property
     def stage(self):
@@ -53,7 +57,8 @@ class Game:
     def snapshot(self, phase="play"):
         p = self.combat.player
         return {"version": 1, "stage": self.index, "phase": phase, "hp": max(1, p.hp),
-                "upgrades": dict(p.upgrades), "cleared": list(self.cleared), "weapon": p.weapon}
+                "upgrades": dict(p.upgrades), "cleared": list(self.cleared), "weapon": p.weapon,
+                "elements": list(self.owned_elements), "element": self.combat.element}
 
     def persist(self, phase="play"):
         if self.training or self.trial:
@@ -74,14 +79,21 @@ class Game:
         player.weapon = weapon if weapon in self.available_weapons(index) else 1
         if upgrades:
             player.upgrades = dict(upgrades)
+        previous_element = self.combat.element
         self.combat = Combat(make_arena(stage), player,
-                             purification=index >= 5, seal_break=index >= 10)
+                             purification=index >= 5, seal_break=index >= 10,
+                             auto_echo=index == 8)
+        self.combat.element = previous_element if previous_element in self.owned_elements else None
+        self.element_drops = [(kind, pos) for kind, pos in
+                              ([("ice", Vec(350, 255)), ("fire", Vec(770, 255))] if index == 15 else [])
+                              if kind not in self.owned_elements]
         self.combat.defend_pos = self.beacon_pos if index == 1 else None
         self.beacon_hp = 8 if index == 1 else 0
         self.beacon_timer = 1.0
         self.remote_timer, self.remote_shots = 2.4, 0
         self.transit_progress, self.transit_x = 0.0, 560.0
         self.mode, self.paused = "play", False
+        self.inventory_open = False
         self.wave_index = 0
         self.gate_open = False
         self.stage_hits = 0
@@ -94,7 +106,7 @@ class Game:
             self.combat.spawn_device(kind, Vec(x, y), device[3] if len(device) > 3 else "")
         if stage.get("boss"):
             self.combat.uid += 1
-            boss_type = {True: Guardian, "knight": Knight, "dragon": Dragon}[stage["boss"]]
+            boss_type = FinalDragon if index == 15 else {True: Guardian, "knight": Knight, "dragon": Dragon}[stage["boss"]]
             self.combat.enemies.append(boss_type(self.combat.uid, Vec(560, 490)))
             if index == 14:
                 # 성역의 공급 결정을 파괴한 결과가 최종 보스 체력에 남는다.
@@ -110,9 +122,27 @@ class Game:
         elif index == 14 and destroyed:
             self.tell(f"성역의 공급선 {destroyed}개를 끊어 드래곤의 체력이 약해졌습니다.", 4)
         if persist:
-            self.persist()
+            self.persist("play")
+
+    def pickup_element(self):
+        """3-6의 가까운 원소를 E로 주워 아이템 목록에 저장한다."""
+        if self.mode != "play" or self.index != 15 or self.paused:
+            return False
+        pos = self.combat.player.pos
+        for index, (kind, drop_pos) in enumerate(self.element_drops):
+            if pos.distance(drop_pos) <= 65:
+                self.element_drops.pop(index)
+                if kind not in self.owned_elements:
+                    self.owned_elements.append(kind)
+                self.combat.element = kind
+                self.combat.events.append(("element_" + kind, drop_pos))
+                self.tell(("얼음" if kind == "ice" else "불") + " 획득! 대시 후 커서로 조준하고 우클릭하세요.", 3)
+                self.persist()
+                return True
+        return False
 
     def new_game(self):
+        self.owned_elements = []
         self.training, self.trial, self.cleared = False, False, []
         self.records = {"kills": 0, "hits": 0, "time": 0.0}
         self.load_stage(0)
@@ -121,6 +151,8 @@ class Game:
         if not self.saved:
             return False
         data = copy.deepcopy(self.saved)
+        self.owned_elements = list(data.get("elements", []))
+        self.combat.element = data.get("element")
         self.training, self.trial, self.cleared = False, False, data["cleared"]
         self.load_stage(data["stage"], data["upgrades"], data["hp"], persist=False,
                         weapon=data.get("weapon", 1))
@@ -154,6 +186,8 @@ class Game:
         if self.mode != "select" or not 0 <= index < len(self.stages):
             return False
         self.training, self.trial = False, True
+        self.owned_elements = []
+        self.combat.element = None
         self.cleared = list(range(index))
         levels = {key: 0 for key in C.UPGRADES}
         for i in range(min(index, C.UPGRADE_LIMIT * len(C.UPGRADES))):
@@ -176,16 +210,41 @@ class Game:
         return (1,) + ((2,) if index >= 8 else ()) + ((3,) if index >= 10 else ())
 
     def select_weapon(self, number):
-        if self.mode != "play" or self.paused or number not in (1, 2, 3):
+        if self.mode != "play" or (self.paused and not self.inventory_open) or number not in (1, 2, 3):
             return False
         if number not in self.available_weapons(self.index):
             self.tell("아직 획득하지 않은 무기입니다.")
             return False
+        self.combat.element = None
         if self.combat.player.weapon != number:
             self.combat.player.weapon = number
             self.combat.events.append(("weapon_switch", self.combat.player.pos))
             self.tell({1: "기본 검", 2: "냉기 검 · 적 둔화", 3: "파쇄 검 · 느리지만 강력한 일격"}[number], 1.7)
         return True
+
+    def select_item(self, slot):
+        if self.mode != "play" or (self.paused and not self.inventory_open):
+            return False
+        if slot < 3:
+            return self.select_weapon(slot + 1)
+        kind = "ice" if slot == 3 else "fire" if slot == 4 else None
+        if kind not in self.owned_elements:
+            self.tell("E로 원소를 먼저 획득하세요.")
+            return False
+        self.combat.element = kind
+        return True
+
+    def cycle_item(self, step):
+        slots = [n - 1 for n in self.available_weapons(self.index)]
+        slots += [3 + i for i, kind in enumerate(("ice", "fire")) if kind in self.owned_elements]
+        current = (3 if self.combat.element == "ice" else 4) if self.combat.element else self.combat.player.weapon - 1
+        return self.select_item(slots[(slots.index(current) + step) % len(slots)])
+
+    def toggle_inventory(self):
+        if self.mode != "play" or (self.paused and not self.inventory_open):
+            return
+        self.inventory_open = not self.inventory_open
+        self.paused = self.inventory_open
 
     def exit_to_title(self):
         self.mode, self.paused = "title", False
@@ -266,6 +325,10 @@ class Game:
                 self.combat.projectiles.append(Projectile(origin, velocity, kind="dragon", radius=15))
                 self.combat.events.append(("boss_breath", origin))
                 self.remote_shots += 1
+        if self.index == 15:
+            for enemy in self.combat.enemies:
+                if isinstance(enemy, FinalDragon):
+                    enemy.elements = ["soul"] + list(self.owned_elements)
         self.combat.update(dt, movement)
         if self.index == 1:
             if any(e.kind == "wolf" and e.pos.distance(self.beacon_pos) < 43 for e in self.combat.enemies):
@@ -280,7 +343,10 @@ class Game:
                         return
             else:
                 self.beacon_timer = 1.0
-        if self.stage.get("hazards"):
+        final_stunned = self.index == 15 and any(getattr(e, "state", "") == "stunned" for e in self.combat.enemies)
+        if final_stunned:
+            self.hazard_marker, self.hazard_active, self.hazard_timer = None, 0, 3.5
+        if self.stage.get("hazards") and not final_stunned:
             self.hazard_timer -= dt
             if self.hazard_marker is None and self.hazard_timer <= 0:
                 self.hazard_marker = self.combat.player.pos

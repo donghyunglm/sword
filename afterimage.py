@@ -5,13 +5,15 @@ import config as C
 class Trail:
     """실제 이동 구간을 일정 거리 간격으로 보간한다. 표시 잔영은 그 일부만 사용."""
 
-    def __init__(self, origin, direction, lifetime):
+    def __init__(self, origin, direction, lifetime, element=None, weapon=1):
         self.points = [origin]
         self.direction = direction
         self.remaining = lifetime
         self.lifetime = lifetime
         self.last = origin
         self.remainder = 0.0
+        self.element = element
+        self.weapon = weapon
 
     def record(self, pos):
         delta = pos - self.last
@@ -43,6 +45,7 @@ class Slash:
     resolved: bool = False
     style: str = "trail"
     weapon: int = 1
+    element: object = None
     next_point: int = 0
     hit_ids: object = None
     pending_links: object = None

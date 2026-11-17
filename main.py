@@ -42,7 +42,8 @@ def prepare_scene(game, name):
     game.training = False
     scene_stages = {"boss": 4, "fortress": 5, "devices": 6, "knight": 9, "chain": 0, "beacon": 1,
                     "weapon-frost": 8, "weapon-shatter": 10,
-                    "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14, "transit": 4,
+                    "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14,
+                    "final": 15, "parry": 15, "inventory": 15, "element-ice": 15, "element-fire": 15, "fire-volley": 15, "transit": 4,
                     "dragon-attack": 14}
     game.load_stage(scene_stages.get(name, 0), persist=False)
     if name == "play":
@@ -68,6 +69,20 @@ def prepare_scene(game, name):
         game.combat.slash()
         for _ in range(22):
             game.combat.update(1 / 120)
+    if name in ("element-ice", "element-fire", "fire-volley"):
+        from afterimage import Trail
+        kind = "fire" if name == "fire-volley" else name.split("-")[1]
+        drop = next(pos for element, pos in game.element_drops if element == kind)
+        game.combat.player.pos = drop
+        game.pickup_element()
+        game.combat.player.pos = Vec(760, 325)
+        game.combat.player.facing = Vec(1, 0)
+        game.combat.trail = Trail(Vec(340, 325), Vec(1, 0), 1.2, kind)
+        game.combat.trail.record(game.combat.player.pos)
+        game.combat.trail.finish()
+        if name == "fire-volley":
+            game.combat.element_skill.cast(game.combat, Vec(0, 1))
+            game.combat.element_skill.update(0.25, game.combat)
     if name == "fortress":
         game.combat.spawn("mage", Vec(360, 470))
         game.combat.spawn("sentinel", Vec(770, 470))
@@ -111,14 +126,32 @@ def prepare_scene(game, name):
         game.combat.slash()
     if name in ("upgrade", "defeat", "victory"):
         game.mode = name
+    if name == "inventory":
+        game.owned_elements = ["ice", "fire"]
+        game.combat.element = "fire"
+        game.toggle_inventory()
+    if name == "parry":
+        c = game.combat
+        boss = c.enemies[0]
+        c.player.pos = Vec(560, 310)
+        boss.pos = Vec(560, 375)
+        boss.state, boss.timer, boss.direction = "charge", 0.5, Vec(0, -1)
+        boss.shield_element = "fire"
+        c.parry()
+        c.update(1 / 120)
+        c.dash(Vec(1, 0))
+        for _ in range(23):
+            c.update(1 / 120)
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="잔영의 검 / Python + pico2d")
     parser.add_argument("--training", action="store_true", help="저장하지 않는 연습장으로 시작")
+    parser.add_argument("--element-demo", action="store_true", help="저장하지 않고 3-6 원소 체험으로 바로 시작")
+    parser.add_argument("--combat-demo", action="store_true", help="저장하지 않고 2-4 자동 잔영 전투로 바로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
     parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon", "weapon-frost", "weapon-shatter", "transit",
-                                            "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack",
+                                            "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack", "final", "element-ice", "element-fire", "fire-volley", "inventory", "parry",
                                             "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
     parser.add_argument("--capture", type=Path)
@@ -148,9 +181,16 @@ def main(argv=None):
         game = Game(save_path=Path(__file__).resolve().parent / (".cache/smoke-save.json" if args.smoke_test else "saves/progress.json"))
         if args.smoke_test:
             prepare_scene(game, args.scene)
+        elif args.element_demo:
+            game.open_trial_select()
+            game.start_trial(15)
+        elif args.combat_demo:
+            game.open_trial_select()
+            game.start_trial(8)
         elif args.training:
             game.start_training()
         pressed = set()
+        mouse_pos = Vec(C.WIDTH / 2, C.HEIGHT / 2)
         running, frames, accumulator = True, 0, 0.0
         last = time.perf_counter()
         was_focused = bool(SDL_GetWindowFlags(engine.window) & SDL_WINDOW_INPUT_FOCUS)
@@ -170,6 +210,37 @@ def main(argv=None):
                     running = False
                 elif event.type == pico.SDL_KEYUP:
                     pressed.discard(event.key)
+                elif event.type == pico.SDL_MOUSEMOTION:
+                    mouse_pos = Vec(event.x, C.HEIGHT - 1 - event.y)
+                elif event.type == pico.SDL_MOUSEWHEEL:
+                    if game.mode == "play" and event.y:
+                        game.cycle_item(1 if event.y < 0 else -1)
+                elif event.type == pico.SDL_MOUSEBUTTONDOWN:
+                    mouse_pos = Vec(event.x, C.HEIGHT - 1 - event.y)
+                    if game.mode != "play":
+                        continue
+                    if game.inventory_open:
+                        if event.button == 1 and 265 <= mouse_pos.x <= 855:
+                            row = round((500 - mouse_pos.y) / 70)
+                            if 0 <= row < 5 and abs(mouse_pos.y - (500 - row * 70)) <= 29:
+                                game.select_item(row)
+                        continue
+                    if game.paused:
+                        continue
+                    if event.button == 1 and 575 <= mouse_pos.y <= 641 and 35 <= mouse_pos.x < 325:
+                        game.select_item(int((mouse_pos.x - 35) // 58))
+                    elif 98 <= mouse_pos.y <= 634 and 30 <= mouse_pos.x <= 1090:
+                        aim = (mouse_pos - game.combat.player.pos).normalized()
+                        if aim.length():
+                            game.combat.player.facing = aim
+                        if event.button == 1:
+                            game.combat.slash()
+                        elif event.button == 3:
+                            if game.combat.skill_element:
+                                if not game.combat.element_skill.cast(game.combat, game.combat.player.facing, mouse_pos):
+                                    game.tell("재사용 대기 중" if game.combat.element_skill.cooldown else "먼저 대시로 잔영을 남기세요.", 1)
+                            elif not game.combat.auto_echo:
+                                game.combat.slash()
                 elif event.type == pico.SDL_KEYDOWN:
                     key = event.key
                     repeat = key in pressed
@@ -202,10 +273,20 @@ def main(argv=None):
                         elif key == pico.SDLK_ESCAPE:
                             game.exit_to_title()
                     elif game.mode == "play":
-                        if key == pico.SDLK_ESCAPE:
+                        if key == pico.SDLK_TAB:
+                            game.toggle_inventory()
+                            pressed.clear()
+                        elif key == pico.SDLK_ESCAPE and game.inventory_open:
+                            game.toggle_inventory()
+                            pressed.clear()
+                        elif key == pico.SDLK_ESCAPE:
                             game.paused = not game.paused
                             pressed.clear()
                         elif game.paused:
+                            if game.inventory_open:
+                                if pico.SDLK_1 <= key <= pico.SDLK_5:
+                                    game.select_item(key - pico.SDLK_1)
+                                continue
                             if key == pico.SDLK_RETURN:
                                 game.paused = False
                             elif key == pico.SDLK_q:
@@ -215,13 +296,22 @@ def main(argv=None):
                         elif key == pico.SDLK_SPACE:
                             # 같은 프레임에서 방향키와 대시를 누른 경우도 마지막 입력을 반영.
                             direction = movement(pressed, pico)
-                            if direction.length():
-                                game.combat.player.facing = direction.normalized()
-                            game.combat.dash()
+                            aim = (mouse_pos - game.combat.player.pos).normalized()
+                            if aim.length():
+                                game.combat.player.facing = aim
+                            game.combat.dash(direction)
+                        elif key == pico.SDLK_f:
+                            game.combat.parry()
                         elif key == pico.SDLK_j:
                             game.combat.slash()
-                        elif key in (pico.SDLK_1, pico.SDLK_2, pico.SDLK_3):
-                            game.select_weapon(key - pico.SDLK_1 + 1)
+                        elif key in (pico.SDLK_e, pico.SDLK_z):
+                            game.pickup_element()
+                        elif key == pico.SDLK_g:
+                            direction = mouse_pos - game.combat.player.pos
+                            game.combat.element_skill.cast(game.combat,
+                                direction if direction.length() else game.combat.player.facing, mouse_pos)
+                        elif key in (pico.SDLK_1, pico.SDLK_2, pico.SDLK_3, pico.SDLK_4, pico.SDLK_5):
+                            game.select_item(key - pico.SDLK_1)
                     elif game.mode == "upgrade":
                         if key in (pico.SDLK_1, pico.SDLK_2, pico.SDLK_3):
                             game.choose_upgrade(key - pico.SDLK_1)
@@ -242,6 +332,7 @@ def main(argv=None):
             accumulator += dt
             while accumulator >= C.FIXED_DT:
                 if not args.smoke_test:
+                    game.combat.aim_target = mouse_pos
                     game.update(C.FIXED_DT, movement(pressed, pico))
                 accumulator -= C.FIXED_DT
             for event, _ in game.combat.events:

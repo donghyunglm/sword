@@ -44,7 +44,7 @@ class SpriteBank:
         except (OSError, ValueError) as error:
             self.warnings.append(str(error))
 
-    def draw(self, name, pos, time, direction=None, state="idle", alpha=1, scale=1):
+    def draw(self, name, pos, time, direction=None, state="idle", alpha=1, scale=1, glow=False):
         if name not in self.entries:
             return False
         image, config, fw, fh, frames = self.entries[name]
@@ -75,8 +75,14 @@ class SpriteBank:
         width = float(config.get("draw_width", fw * 2)) * scale
         height = float(config.get("draw_height", fh * 2)) * scale
         image.opacify(alpha)
+        if glow:
+            from sdl2 import SDL_SetTextureBlendMode, SDL_BLENDMODE_ADD
+            SDL_SetTextureBlendMode(image.texture, SDL_BLENDMODE_ADD)
         image.clip_draw(frame * fw, bottom, fw, fh, pos.x,
                         pos.y + float(config.get("offset_y", 8)), width, height)
+        if glow:
+            from sdl2 import SDL_BLENDMODE_BLEND
+            SDL_SetTextureBlendMode(image.texture, SDL_BLENDMODE_BLEND)
         image.opacify(1)
         return True
 

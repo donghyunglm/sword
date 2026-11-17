@@ -27,6 +27,10 @@ def validate(data, stage_count=None):
     if data.get("phase") not in ("play", "upgrade", "transit", "victory"):
         raise ValueError("진행 상태가 잘못되었습니다.")
     weapon = data.get("weapon", 1)
+    elements = data.get("elements", [])
+    if (not isinstance(elements, list) or any(e not in ("ice", "fire") for e in elements)
+            or len(elements) != len(set(elements)) or data.get("element") not in [None] + elements):
+        raise ValueError("원소 소지 정보가 잘못되었습니다.")
     if type(weapon) is not int or weapon not in (1, 2, 3):
         raise ValueError("무기 정보가 잘못되었습니다.")
     if (weapon == 2 and index < 8) or (weapon == 3 and index < 10):
@@ -52,7 +56,11 @@ def read_save(path=DEFAULT_PATH):
     if not path.exists():
         return None, ""
     try:
-        return validate(json.loads(path.read_text(encoding="utf-8"))), ""
+        data = json.loads(path.read_text(encoding="utf-8"))
+        from stage import load_stages
+        if isinstance(data, dict) and data.get("phase") == "side" and data.get("stage") == len(load_stages()) - 1:
+            data["phase"] = "play"
+        return validate(data), ""
     except (OSError, ValueError, TypeError):
         # 손상된 파일은 자동 삭제하지 않고 보존한다.
         return None, "저장을 읽지 못했습니다. 기존 파일은 보존됩니다. 새 모험을 시작할 수 있습니다."
