@@ -83,7 +83,7 @@ def run(start=0):
             delta = target.pos - player.pos
             distance = delta.length()
             if isinstance(target, FinalDragon):
-                # 기본 속성 방어막을 검격으로 깎고, 몸통 돌진은 F 패링 동작으로 대응한다.
+                # 기본 속성 방어막을 검격으로 깎고, 몸통 돌진은 우클릭 패링 동작으로 대응한다.
                 player.facing = delta.normalized()
                 if target.state == "charge" and distance < 110:
                     c.parry()
@@ -93,7 +93,7 @@ def run(start=0):
                 else:
                     direction = steer(c.arena, player.pos, delta.normalized() if distance > 92 else delta.normalized() * -1 if distance < 80 else Vec())
                 if distance < 108 and not player.dash_left:
-                    c.slash()
+                    c.basic_attack()
             elif target.kind == "dragon":
                 if target.state == "tell" and target.timer < 0.14 and c.ready and distance < 95:
                     player.facing = Vec(-target.direction.y, target.direction.x)

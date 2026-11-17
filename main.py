@@ -233,14 +233,17 @@ def main(argv=None):
                         aim = (mouse_pos - game.combat.player.pos).normalized()
                         if aim.length():
                             game.combat.player.facing = aim
-                        if event.button == 1:
-                            game.combat.slash()
-                        elif event.button == 3:
+                        if event.button == 3:
+                            game.combat.parry()
+                        elif event.button == 1:
                             if game.combat.skill_element:
                                 if not game.combat.element_skill.cast(game.combat, game.combat.player.facing, mouse_pos):
                                     game.tell("재사용 대기 중" if game.combat.element_skill.cooldown else "먼저 대시로 잔영을 남기세요.", 1)
                             elif not game.combat.auto_echo:
-                                game.combat.slash()
+                                if game.combat.trail is not None or game.combat.echo_pos is not None:
+                                    game.combat.slash()
+                                else:
+                                    game.tell("대시로 잔영을 남긴 뒤 좌클릭하세요.", 1)
                 elif event.type == pico.SDL_KEYDOWN:
                     key = event.key
                     repeat = key in pressed
@@ -300,10 +303,11 @@ def main(argv=None):
                             if aim.length():
                                 game.combat.player.facing = aim
                             game.combat.dash(direction)
-                        elif key == pico.SDLK_f:
-                            game.combat.parry()
-                        elif key == pico.SDLK_j:
-                            game.combat.slash()
+                        elif key in (pico.SDLK_f, pico.SDLK_j):
+                            aim = mouse_pos - game.combat.player.pos
+                            if aim.length():
+                                game.combat.player.facing = aim.normalized()
+                            game.combat.basic_attack()
                         elif key in (pico.SDLK_e, pico.SDLK_z):
                             game.pickup_element()
                         elif key == pico.SDLK_g:

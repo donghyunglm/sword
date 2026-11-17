@@ -380,6 +380,18 @@ class Renderer:
                 line(enemy.pos - enemy.direction * 40, enemy.pos, GOLD, 120)
             if game.index == 15 and hasattr(enemy, "shield_hp"):
                 self.boss_shield(enemy)
+                if enemy.attack == "lunge" and enemy.state in ("tell", "charge"):
+                    # 공격 범위를 덮지 않고 몸 앞의 화살표로 돌진 방향만 알린다.
+                    direction = enemy.direction
+                    side = Vec(-direction.y, direction.x)
+                    start = enemy.pos + direction * (enemy.radius + 8)
+                    tip = start + direction * (43 if enemy.aim_locked else 28)
+                    color = GOLD if enemy.aim_locked else SOUL
+                    line(start, tip, color, 235)
+                    line(tip - direction * 13 + side * 9, tip, color, 235)
+                    line(tip - direction * 13 - side * 9, tip, color, 235)
+                    self.text("돌진 준비" if enemy.state == "tell" else "돌진 · 우클릭!",
+                              enemy.pos.x - 45, enemy.pos.y - 85, 16, color)
         actors = [(e.pos.y, e) for e in combat.enemies]
         actors.append((combat.player.pos.y, combat.player))
         actors.extend((wall.y, wall) for wall in combat.arena.walls)
@@ -577,38 +589,42 @@ class Renderer:
             self.ui("boss_frame", 560, 603, 480, 74)
             self.ui_fill("boss_fill", boss.hp / boss.max_hp, 560, 603, 480, 74, 95, 220)
             label = {"guardian": "숲의 수호수", "knight": "봉인 수호기사", "dragon": "침식된 드래곤"}[boss.kind]
-            state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! 좌클릭", "stunned": "패링 성공 · 반격", "recover": "회복", "approach": "대기"}[boss.state]
+            state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! F 검격", "stunned": "패링 성공 · 반격", "recover": "회복", "approach": "대기"}[boss.state]
             self.text(label + "  /  " + state, 325, 666, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, (9, 17, 27), 245)
         rect(0, 77, C.WIDTH, 2, (68, 98, 107))
         self.ui("dash_ready" if c.ready else "dash_cooldown", 57, 39, 59, 59)
         self.text("SPACE", 95, 44, 16, CYAN if c.ready else MUTED)
         self.text("대시 준비" if c.ready else "재충전", 95, 22, 16, WHITE)
-        self.ui("slash", 290, 39, 59, 59)
-        self.text("좌클릭", 331, 44, 18, GOLD)
-        self.text("즉시 검격" if c.auto_echo or c.element or c.counter_left > 0 else "잔영 참격" if c.trail or c.echo_pos else "검격",
-                  331, 22, 16, WHITE)
-        self.ui("slot_normal", 530, 40, 63, 63)
+        self.ui("slash", 260, 39, 59, 59)
+        self.text("F", 300, 44, 20, GOLD)
+        self.text("기본 검격", 300, 22, 16, WHITE)
+        circle(Vec(460, 39), 22, SOUL if game.index == 15 else MUTED, 165)
+        line(Vec(447, 39), Vec(460, 22), SOUL, 180)
+        line(Vec(460, 22), Vec(475, 52), SOUL, 180)
+        self.text("우클릭", 495, 44, 18, SOUL)
+        self.text("패링" if game.index == 15 else "3-6 패링", 495, 22, 16, WHITE if game.index == 15 else MUTED)
+        self.ui("slot_normal", 650, 40, 63, 63)
         if c.skill_element:
             if c.skill_element == "soul":
-                self.ui("weapon_basic", 530, 40, 45, 45)
+                self.ui("weapon_basic", 650, 40, 45, 45)
             else:
-                self.bank.draw_cell(c.skill_element + "_relic_test", 0, 0, Vec(530, 40), 84, 56)
-            self.text("우클릭  " + {"fire": "화염 연사", "ice": "얼음 결정", "soul": "영혼 연사"}[c.skill_element], 572, 45, 18, element_color(c.skill_element))
+                self.bank.draw_cell(c.skill_element + "_relic_test", 0, 0, Vec(650, 40), 84, 56)
+            self.text("좌클릭 " + {"fire": "화염 연사", "ice": "얼음 결정", "soul": "영혼 연사"}[c.skill_element], 690, 45, 18, element_color(c.skill_element))
             wait = c.element_skill.cooldown
-            status = f"재사용 {wait:.1f}초" if wait else "대시 후 커서로 조준" if not c.trail else "커서 방향으로 우클릭 발사"
-            self.text(status, 572, 22, 16, MUTED if wait else WHITE)
+            status = f"재사용 {wait:.1f}초" if wait else "대시 후 커서로 조준" if not c.trail else "커서 방향으로 좌클릭 발사"
+            self.text(status, 690, 22, 16, MUTED if wait else WHITE)
         else:
-            self.ui(("weapon_basic", "weapon_frost", "weapon_shatter")[player.weapon - 1], 530, 40, 46, 46)
-            self.text("대시 경로 잔영 검격", 572, 45, 18, CYAN)
-            self.text("자동 발동" if c.auto_echo else "우클릭으로 잔영 발동", 572, 22, 16, MUTED)
+            self.ui(("weapon_basic", "weapon_frost", "weapon_shatter")[player.weapon - 1], 650, 40, 46, 46)
+            self.text("대시 경로 잔영 검격", 690, 45, 18, CYAN)
+            self.text("자동 발동" if c.auto_echo else "좌클릭으로 잔영 발동", 690, 22, 16, MUTED)
         self.text("Tab 아이템", 955, 48, 16, MUTED)
         self.text("휠 교체 / Esc 메뉴", 920, 24, 14, MUTED)
         if game.index == 15:
             if c.counter_left > 0:
                 self.text(f"반격 {c.counter_left:.1f}초 · 연속 {c.counter_charges}회 · 배후 일격", 350, 83, 18, GOLD)
             else:
-                self.text("F 패링 " + (f"{c.parry_cooldown:.1f}초" if c.parry_cooldown else "준비"), 450, 83, 18, SOUL)
+                self.text("우클릭 패링 " + (f"{c.parry_cooldown:.1f}초" if c.parry_cooldown else "준비 · 판정 0.25초"), 400, 83, 18, SOUL)
             if c.parry_left > 0:
                 circle(player.pos, 35, GOLD, 200)
         if game.toast_left > 0:
@@ -616,7 +632,7 @@ class Renderer:
             self.center(game.toast, 132, 18, GOLD)
         elif game.banner_left > 0:
             self.ui("notice_panel", 560, 140, 1010, 68)
-            self.center(game.stage["tip"].replace("J", "좌클릭"), 132, 16, MUTED)
+            self.center(game.stage["tip"].replace("J", "F"), 132, 16, MUTED)
         if game.notice:
             self.text(game.notice, 55, 82, 14, RED)
 
@@ -679,7 +695,7 @@ class Renderer:
             self.center("클릭 · 휠로 교체 / Tab · Esc로 닫기", 560, 18, MUTED)
             labels = ("기본 검", "냉기 검", "파쇄 검", "얼음 원소", "불 원소")
             descriptions = ("검격과 대시 경로 참격", "근처 적 빙결 · 이동 속도 감소", "갑옷과 결정에 강한 검격",
-                            "우클릭: 잔영에서 빙결탄 연사 · 3초", "우클릭: 잔영에서 화염탄 연사 · 3초")
+                            "좌클릭: 잔영에서 빙결탄 연사 · 3초", "좌클릭: 잔영에서 화염탄 연사 · 3초")
             for slot in range(5):
                 y = 500 - slot * 70
                 owned = slot + 1 in game.available_weapons(game.index) if slot < 3 else ("ice" if slot == 3 else "fire") in game.owned_elements

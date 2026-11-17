@@ -39,6 +39,15 @@ class CombatTests(unittest.TestCase):
         self.assertFalse(c.dash())
         self.assertLess(c.trail.points[0].y, c.trail.points[-1].y)
 
+    def test_basic_attack_preserves_pending_echo_path(self):
+        c = Combat()
+        c.dash()
+        self.tick(c, 0.2)
+        trail = c.trail
+        self.assertTrue(c.basic_attack())
+        self.assertEqual(c.slashes[-1].style, "direct")
+        self.assertIs(c.trail, trail)
+
     def test_auto_echo_mode_keeps_j_direct_and_releases_dash_trail(self):
         c = Combat(auto_echo=True)
         self.assertTrue(c.slash())

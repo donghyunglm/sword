@@ -13,13 +13,14 @@ class FinalDragonTests(unittest.TestCase):
         c.enemies = [boss]
         return c, boss
 
-    def test_parry_stuns_two_seconds_blocks_damage_and_grants_two_casts(self):
+    def test_parry_stuns_three_seconds_blocks_damage_and_grants_two_casts(self):
         c, boss = self.encounter()
         boss.shield_element = "fire"
         self.assertTrue(c.parry())
         c.update(1 / 120)
         self.assertEqual(boss.state, "stunned")
-        self.assertEqual(boss.timer, 2)
+        self.assertEqual(boss.timer, 3)
+        self.assertEqual(c.counter_left, 3)
         self.assertEqual(c.player.hp, 6)
         self.assertEqual(c.counter_charges, 2)
         self.assertEqual(c.skill_element, "fire")
@@ -75,8 +76,35 @@ class FinalDragonTests(unittest.TestCase):
     def test_stun_ends_and_shield_returns(self):
         c, boss = self.encounter()
         boss.break_shield(True)
-        boss.update(1.99, c.player, c.arena)
+        boss.update(2.99, c.player, c.arena)
         self.assertEqual(boss.state, "stunned")
         boss.update(0.02, c.player, c.arena)
         self.assertEqual(boss.shield_hp, 8)
         self.assertEqual(boss.state, "recover")
+
+    def test_parry_window_is_quarter_second(self):
+        c, boss = self.encounter()
+        boss.pos, boss.state, boss.timer = Vec(800, 500), "approach", 10
+        c.parry()
+        c.update(0.24)
+        self.assertGreater(c.parry_left, 0)
+        c.update(0.02)
+        self.assertEqual(c.parry_left, 0)
+
+    def test_charge_aims_at_player_at_launch(self):
+        c, boss = self.encounter()
+        boss.state, boss.timer = "tell", 0.5
+        c.player.pos = Vec(300, 200)
+        boss.update(0.25, c.player, c.arena)
+        self.assertLess(boss.direction.x, 0)
+        c.player.pos = Vec(800, 210)
+        boss.update(0.26, c.player, c.arena)
+        expected = (c.player.pos - boss.pos).normalized()
+        self.assertEqual(boss.state, "charge")
+        self.assertAlmostEqual(boss.direction.x, expected.x)
+        self.assertAlmostEqual(boss.direction.y, expected.y)
+        origin = boss.pos
+        boss.update(0.05, c.player, c.arena)
+        movement = (boss.pos - origin).normalized()
+        self.assertAlmostEqual(movement.x, expected.x)
+        self.assertAlmostEqual(movement.y, expected.y)

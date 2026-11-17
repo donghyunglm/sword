@@ -136,7 +136,7 @@ class Game:
                     self.owned_elements.append(kind)
                 self.combat.element = kind
                 self.combat.events.append(("element_" + kind, drop_pos))
-                self.tell(("얼음" if kind == "ice" else "불") + " 획득! 대시 후 커서로 조준하고 우클릭하세요.", 3)
+                self.tell(("얼음" if kind == "ice" else "불") + " 획득! 대시 후 커서로 조준하고 좌클릭하세요.", 3)
                 self.persist()
                 return True
         return False

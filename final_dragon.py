@@ -1,10 +1,13 @@
-"""3-6 전용: 속성 방어막, 몸통 돌진 패링, 2초 반격 창."""
+"""3-6 전용: 속성 방어막, 몸통 돌진 패링, 3초 반격 창."""
 import random
 from late_bosses import Dragon
 from geometry import Vec
 
 
 class FinalDragon(Dragon):
+    PARRY_WINDOW = 0.25
+    STUN_TIME = 3.0
+
     def __init__(self, uid, pos):
         super().__init__(uid, pos)
         self.hp = self.max_hp = 36
@@ -15,10 +18,11 @@ class FinalDragon(Dragon):
         self.elements = ["soul"]
         self.rng = random.Random()
         self.attack = "lunge"
+        self.aim_locked = False
 
     def break_shield(self, parried=False):
         self.shield_hp = 0
-        self.state, self.timer = ("stunned" if parried else "weak"), 2.0
+        self.state, self.timer = ("stunned", self.STUN_TIME) if parried else ("weak", 2.0)
         self.hazard_time = self.breath_reach = 0
         self.weak_used = False
 
@@ -48,10 +52,16 @@ class FinalDragon(Dragon):
             if self.timer <= 0:
                 self.attack = "lunge" if self.cycles % 2 == 0 else "breath"
                 self.state, self.timer = "tell", 0.85
+                self.aim_locked = False
                 self.breath_reach = 0
             return
         if self.state == "tell":
+            # 돌진 시작 순간의 실제 플레이어 위치를 향한다.
+            aim = player.pos - self.pos
+            if aim.length():
+                self.direction = aim.normalized()
             if self.timer <= 0:
+                self.aim_locked = True
                 self.state, self.timer = ("charge", 0.65) if self.attack == "lunge" else ("attack", 0.65)
             return
         if self.state == "charge":

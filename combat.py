@@ -61,7 +61,7 @@ class Combat:
         if (not any(isinstance(e, FinalDragon) for e in self.enemies) or self.player.hp <= 0
                 or self.player.dash_left or self.parry_cooldown > 0):
             return False
-        self.parry_left, self.parry_cooldown = 0.18, 0.75
+        self.parry_left, self.parry_cooldown = FinalDragon.PARRY_WINDOW, 0.75
         self.events.append(("parry_ready", self.player.pos))
         return True
 
@@ -116,16 +116,20 @@ class Combat:
         self.events.append(("dash", p.pos))
         return True
 
+    def basic_attack(self):
+        """F 전용 직접 검격. 남아 있는 잔영은 좌클릭용으로 보존한다."""
+        if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
+                or any(not s.resolved and s.style == "direct" for s in self.slashes)):
+            return False
+        self.slashes.append(Slash([self.player.pos], self.player.facing.normalized(),
+                                  55 + self.player.upgrades["range"] * 7,
+                                  style="direct", weapon=self.player.weapon))
+        self.events.append(("slash", self.player.pos))
+        return True
+
     def slash(self):
         if self.auto_echo or self.element or self.counter_left > 0:
-            if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
-                    or any(not s.resolved and s.style == "direct" for s in self.slashes)):
-                return False
-            self.slashes.append(Slash([self.player.pos], self.player.facing.normalized(),
-                                      55 + self.player.upgrades["range"] * 7,
-                                      style="direct", weapon=self.player.weapon))
-            self.events.append(("slash", self.player.pos))
-            return True
+            return self.basic_attack()
         if self.dual_mode:
             if (self.player.hp <= 0 or self.player.dash_left > 0 or self.player.cooldown > 0
                     or any(not s.resolved for s in self.slashes)):
@@ -383,7 +387,7 @@ class Combat:
                 self.counter_element = enemy.shield_element
                 enemy.break_shield(parried=True)
                 enemy.pos, _ = self.arena.move(enemy.pos, enemy.direction * -32, enemy.radius)
-                self.counter_left, self.counter_charges = 2.0, 2
+                self.counter_left, self.counter_charges = FinalDragon.STUN_TIME, 2
                 self.backstab_ready = True
                 self.parry_left = 0
                 p.cooldown = 0
