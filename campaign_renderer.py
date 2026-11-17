@@ -107,11 +107,19 @@ class CampaignRenderer(Renderer):
         self.center('출발하기', 155, 26, CYAN)
         self.center('1~4 지역 선택 · Esc 거점으로', 65, 18)
 
-    def shortcut_image(self, token, x, y, size=40):
+    def shortcut_image(self, token, x, y, size=40, skill_icon=False):
         if not token: return
         kind, key = token.split(':')
         if kind == 'weapon':
             self.ui({'1': 'weapon_basic', '2': 'weapon_frost', '3': 'weapon_shatter'}[key], x, y, size, size)
+        elif skill_icon and key in ('ice_stone', 'fire_stone'):
+            entry = self.bank.entries.get(key.removesuffix('_stone') + '_relic_test')
+            if entry:
+                image = entry[0]
+                # 원본의 넓은 투명 여백만 제외해 기존 스킬 그림을 또렷하게 표시한다.
+                image.clip_draw(int(image.w * .31), int(image.h * .08),
+                                int(image.w * .38), int(image.h * .88),
+                                x, y, size, size * 1.3)
         else:
             self.image(key, x, y, size, size)
 
@@ -124,10 +132,11 @@ class CampaignRenderer(Renderer):
             selected = token is not None and token == game.active_shortcut()
             self.ui('slot_selected' if selected or slot == target else 'slot_normal', x, 608, 54, 54)
             if token:
-                if owned: self.shortcut_image(token, x + 2, 600, 30)
-                else: self.ui('slot_locked', x + 2, 600, 30, 30)
-            rect(x - 18, 612, 14, 13, INK, 255)
-            self.text(str(slot + 1), x - 15, 618, 14, GOLD if selected else WHITE)
+                if owned: self.shortcut_image(token, x + 6, 605, 28, skill_icon=True)
+                else: self.ui('slot_locked', x + 6, 605, 28, 28)
+            # 왼쪽 위 숫자 영역과 오른쪽 아이콘 영역을 분리한다.
+            rect(x - 19, 612, 10, 13, INK, 255)
+            self.text(str(slot + 1), x - 18, 618, 14, GOLD if selected else WHITE)
             if token == 'item:healing_potion':
                 self.text(str(game.bag.get('healing_potion', 0)), x + 9, 592, 14, GOLD)
 
@@ -149,7 +158,7 @@ class CampaignRenderer(Renderer):
         if game.drag:
             pos = game.pointer_pos
             self.ui('slot_selected', pos.x, pos.y, 60, 60)
-            self.shortcut_image(game.drag['token'], pos.x, pos.y, 45)
+            self.shortcut_image(game.drag['token'], pos.x, pos.y, 45, skill_icon=True)
         if game.toast_left > 0: self.center(game.toast, 85, 16, GOLD)
 
     def release(self, game, pos, button):
