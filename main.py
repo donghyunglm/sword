@@ -7,7 +7,7 @@ import time
 
 import config as C
 from geometry import Vec
-from game import Game
+from campaign import CampaignGame as Game
 
 
 def capture_png(path, pico):
@@ -33,6 +33,11 @@ def capture_png(path, pico):
 
 def prepare_scene(game, name):
     """스모크 테스트 전용 장면. 사용자의 진행 저장을 건드리지 않는다."""
+    if name in ("hub", "forge", "map", "inventory"):
+        game.new_game()
+        if name == "inventory": game.toggle_inventory()
+        else: game.mode = name
+        return
     if name == "title":
         return
     if name == "select":
@@ -45,7 +50,7 @@ def prepare_scene(game, name):
                     "sanctuary": 10, "dragon": 14, "dragon-dual": 14, "dragon-windup": 14,
                     "final": 15, "parry": 15, "inventory": 15, "element-ice": 15, "element-fire": 15, "fire-volley": 15, "transit": 4,
                     "dragon-attack": 14}
-    game.load_stage(scene_stages.get(name, 0), persist=False)
+    game.start_trial(min(14, scene_stages.get(name, 0)))
     if name == "play":
         game.combat.player.pos = Vec(660, 315)
         game.combat.player.facing = Vec(1, 0)
@@ -150,7 +155,7 @@ def main(argv=None):
     parser.add_argument("--element-demo", action="store_true", help="저장하지 않고 3-6 원소 체험으로 바로 시작")
     parser.add_argument("--combat-demo", action="store_true", help="저장하지 않고 2-4 자동 잔영 전투로 바로 시작")
     parser.add_argument("--smoke-test", action="store_true", help="정해진 프레임 후 종료하는 렌더 검사")
-    parser.add_argument("--scene", choices=("title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon", "weapon-frost", "weapon-shatter", "transit",
+    parser.add_argument("--scene", choices=("hub", "forge", "map", "title", "select", "play", "boss", "fortress", "devices", "knight", "chain", "beacon", "weapon-frost", "weapon-shatter", "transit",
                                             "sanctuary", "dragon", "dragon-dual", "dragon-windup", "dragon-attack", "final", "element-ice", "element-fire", "fire-volley", "inventory", "parry",
                                             "upgrade", "defeat", "victory"), default="play")
     parser.add_argument("--frames", type=int, default=120)
@@ -162,7 +167,7 @@ def main(argv=None):
     except ImportError:
         print("pico2d가 없습니다. 선택한 Python에서 python -m pip install -r requirements.txt 를 실행하세요.")
         return 1
-    from renderer import Renderer
+    from campaign_renderer import CampaignRenderer as Renderer
     from audio import Audio
     import pico2d.pico2d as engine
     from sdl2 import (SDL_SetRenderDrawBlendMode, SDL_BLENDMODE_BLEND, SDL_SetWindowTitle,
@@ -178,12 +183,12 @@ def main(argv=None):
         renderer.audio_enabled = audio.enabled
         for warning in renderer.bank.warnings:
             print("임시 그래픽 사용:", warning)
-        game = Game(save_path=Path(__file__).resolve().parent / (".cache/smoke-save.json" if args.smoke_test else "saves/progress.json"))
+        game = Game(save_path=Path(__file__).resolve().parent / (".cache/smoke-save.json" if args.smoke_test else "saves/campaign_progress.json"))
         if args.smoke_test:
             prepare_scene(game, args.scene)
         elif args.element_demo:
             game.open_trial_select()
-            game.start_trial(15)
+            game.start_trial(14)
         elif args.combat_demo:
             game.open_trial_select()
             game.start_trial(8)
@@ -217,6 +222,8 @@ def main(argv=None):
                         game.cycle_item(1 if event.y < 0 else -1)
                 elif event.type == pico.SDL_MOUSEBUTTONDOWN:
                     mouse_pos = Vec(event.x, C.HEIGHT - 1 - event.y)
+                    if renderer.click(game, mouse_pos, event.button):
+                        continue
                     if game.mode != "play":
                         continue
                     if game.inventory_open:
@@ -255,6 +262,20 @@ def main(argv=None):
                     if key == pico.SDLK_m:
                         audio.enabled = not audio.enabled
                         renderer.audio_enabled = audio.enabled
+                    if game.inventory_open:
+                        if key in (pico.SDLK_i, pico.SDLK_ESCAPE, pico.SDLK_TAB): game.toggle_inventory()
+                        continue
+                    if game.mode in ("hub", "forge", "map"):
+                        if key == pico.SDLK_ESCAPE: game.mode = "hub"
+                        elif key == pico.SDLK_i and game.mode == "hub": game.toggle_inventory()
+                        elif key == pico.SDLK_e: game.interact()
+                        elif game.mode == "forge":
+                            if key in (pico.SDLK_1, pico.SDLK_2): game.recipe_index = key - pico.SDLK_1
+                            elif key == pico.SDLK_RETURN: game.craft()
+                        elif game.mode == "map":
+                            if pico.SDLK_1 <= key <= pico.SDLK_4: game.map_region = key - pico.SDLK_1
+                            elif key == pico.SDLK_RETURN: game.launch_region()
+                        continue
                     if game.mode == "title":
                         if key == pico.SDLK_RETURN:
                             game.new_game()
@@ -276,7 +297,7 @@ def main(argv=None):
                         elif key == pico.SDLK_ESCAPE:
                             game.exit_to_title()
                     elif game.mode == "play":
-                        if key == pico.SDLK_TAB:
+                        if key in (pico.SDLK_TAB, pico.SDLK_i):
                             game.toggle_inventory()
                             pressed.clear()
                         elif key == pico.SDLK_ESCAPE and game.inventory_open:

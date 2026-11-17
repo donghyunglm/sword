@@ -199,6 +199,7 @@ class CampaignGame(LegacyGame):
     def enter_hub(self):
         self.mode, self.paused, self.inventory_open, self.in_hub = "hub", False, False, True
         c = self.combat
+        c.player.environment_speed = 1
         c.player.pos, c.player.hp = Vec(560, 285), C.MAX_HP
         c.enemies, c.devices, c.projectiles, c.slashes = [], [], [], []
         c.trail = None

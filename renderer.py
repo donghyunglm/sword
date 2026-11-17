@@ -398,7 +398,8 @@ class Renderer:
         actors.sort(key=lambda item: item[0], reverse=True)
         for _, actor in actors:
             if isinstance(actor, Rect):
-                self.obstacle(game.stage.get("theme", "forest"), actor)
+                if not hasattr(game, "bag"):
+                    self.obstacle(game.stage.get("theme", "forest"), actor)
                 continue
             is_player = actor is combat.player
             kind = "player" if is_player else actor.kind
@@ -427,6 +428,10 @@ class Renderer:
                 radius = 29 + 2 * math.sin(self.visual_time * 3)
                 circle(actor.pos + Vec(0, -10), radius, aura, 38, True)
             draw_state = "weak" if state == "stunned" else "stomp_attack" if kind == "dragon" and state == "charge" else state
+            sprite = getattr(actor, "sprite_key", "")
+            sprite_state = "stun" if state == "stunned" else "tell" if state in ("windup", "tell") else "charge" if state in ("charge", "attack") else "idle"
+            if sprite and self.bank.draw(sprite + "_" + sprite_state, actor.pos, animation_time, direction, scale=2):
+                continue
             self.actor(kind, actor.pos, direction, draw_state, alpha=alpha,
                        flash=not is_player and actor.flash > 0,
                        animation_time=animation_time)

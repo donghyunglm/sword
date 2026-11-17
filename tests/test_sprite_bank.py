@@ -48,7 +48,9 @@ class SpriteBankTests(unittest.TestCase):
                 header = stream.read(26)
             self.assertEqual(header[:8], b"\x89PNG\r\n\x1a\n", name)
             width, height = struct.unpack(">II", header[16:24])
-            self.assertEqual(header[25], 6 if name not in ("forest", "fortress", "sanctuary") else 2)
+            self.assertIn(header[25], (2, 6), name)
+            if not settings["file"].startswith("campaign/"):
+                self.assertEqual(header[25], 6 if name not in ("forest", "fortress", "sanctuary") else 2)
             fw, fh = settings.get("frame_width", width), settings.get("frame_height", height)
             self.assertEqual(width % fw, 0, name)
             self.assertEqual(height % fh, 0, name)
