@@ -1,111 +1,745 @@
 {
   "player": {
-    "file": "images/hero.png", "frame_width": 64, "frame_height": 64,
-    "frames": 6, "draw_width": 80, "draw_height": 80, "offset_y": 8,
-    "direction_order": ["down", "left", "right", "up"],
+    "file": "images/hero.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 6,
+    "draw_width": 80,
+    "draw_height": 80,
+    "offset_y": 8,
+    "direction_order": [
+      "down",
+      "left",
+      "right",
+      "up"
+    ],
     "animations": {
-      "idle": {"row": 0, "frames": 4, "fps": 6},
-      "walk": {"row": 4, "frames": 6, "fps": 10},
-      "dash": {"row": 8, "frames": 4, "fps": 18},
-      "slash": {"row": 12, "frames": 5, "fps": 12}
+      "idle": {
+        "row": 0,
+        "frames": 4,
+        "fps": 6
+      },
+      "walk": {
+        "row": 4,
+        "frames": 6,
+        "fps": 10
+      },
+      "dash": {
+        "row": 8,
+        "frames": 4,
+        "fps": 18
+      },
+      "slash": {
+        "row": 12,
+        "frames": 5,
+        "fps": 12
+      }
     }
   },
   "wolf": {
-    "file": "images/wolf.png", "frame_width": 48, "frame_height": 48,
-    "frames": 4, "draw_width": 58, "draw_height": 58, "offset_y": 6,
-    "animations": {"chase": {"row": 0, "frames": 4, "fps": 8}}
+    "file": "images/wolf.png",
+    "frame_width": 48,
+    "frame_height": 48,
+    "frames": 4,
+    "draw_width": 58,
+    "draw_height": 58,
+    "offset_y": 6,
+    "animations": {
+      "chase": {
+        "row": 0,
+        "frames": 4,
+        "fps": 8
+      }
+    }
   },
   "boar": {
-    "file": "images/boar.png", "frame_width": 64, "frame_height": 64,
-    "frames": 4, "draw_width": 72, "draw_height": 72, "offset_y": 8,
+    "file": "images/boar.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 4,
+    "draw_width": 72,
+    "draw_height": 72,
+    "offset_y": 8,
     "animations": {
-      "chase": {"row": 0, "frames": 4, "fps": 8},
-      "tell": {"row": 4, "frames": 2, "fps": 5},
-      "charge": {"row": 8, "frames": 3, "fps": 14},
-      "recover": {"row": 12, "frames": 3, "fps": 7}
+      "chase": {
+        "row": 0,
+        "frames": 4,
+        "fps": 8
+      },
+      "tell": {
+        "row": 4,
+        "frames": 2,
+        "fps": 5
+      },
+      "charge": {
+        "row": 8,
+        "frames": 3,
+        "fps": 14
+      },
+      "recover": {
+        "row": 12,
+        "frames": 3,
+        "fps": 7
+      }
     }
   },
   "guardian": {
-    "file": "images/guardian.png", "frame_width": 96, "frame_height": 96,
-    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 12,
+    "file": "images/guardian.png",
+    "frame_width": 96,
+    "frame_height": 96,
+    "frames": 4,
+    "draw_width": 70,
+    "draw_height": 70,
+    "offset_y": 12,
     "animations": {
-      "approach": {"row": 0, "frames": 4, "fps": 7},
-      "tell": {"row": 4, "frames": 3, "fps": 5},
-      "charge": {"row": 8, "frames": 4, "fps": 14},
-      "weak": {"row": 12, "frames": 4, "fps": 8},
-      "recover": {"row": 16, "frames": 3, "fps": 6}
+      "approach": {
+        "row": 0,
+        "frames": 4,
+        "fps": 7
+      },
+      "tell": {
+        "row": 4,
+        "frames": 3,
+        "fps": 5
+      },
+      "charge": {
+        "row": 8,
+        "frames": 4,
+        "fps": 14
+      },
+      "weak": {
+        "row": 12,
+        "frames": 4,
+        "fps": 8
+      },
+      "recover": {
+        "row": 16,
+        "frames": 3,
+        "fps": 6
+      }
     }
   },
   "mage": {
-    "file": "images/mage.png", "frame_width": 64, "frame_height": 64,
-    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 8,
+    "file": "images/mage.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 4,
+    "draw_width": 70,
+    "draw_height": 70,
+    "offset_y": 8,
     "animations": {
-      "chase": {"row": 0, "frames": 4, "fps": 8},
-      "cast": {"row": 4, "frames": 4, "fps": 12}
+      "chase": {
+        "row": 0,
+        "frames": 4,
+        "fps": 8
+      },
+      "cast": {
+        "row": 4,
+        "frames": 4,
+        "fps": 12
+      }
     }
   },
   "sentinel": {
-    "file": "images/sentinel.png", "frame_width": 64, "frame_height": 64,
-    "frames": 4, "draw_width": 70, "draw_height": 70, "offset_y": 8,
+    "file": "images/sentinel.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 4,
+    "draw_width": 70,
+    "draw_height": 70,
+    "offset_y": 8,
     "animations": {
-      "chase": {"row": 0, "frames": 4, "fps": 8},
-      "tell": {"row": 4, "frames": 2, "fps": 5},
-      "charge": {"row": 8, "frames": 3, "fps": 14},
-      "recover": {"row": 12, "frames": 3, "fps": 7}
+      "chase": {
+        "row": 0,
+        "frames": 4,
+        "fps": 8
+      },
+      "tell": {
+        "row": 4,
+        "frames": 2,
+        "fps": 5
+      },
+      "charge": {
+        "row": 8,
+        "frames": 3,
+        "fps": 14
+      },
+      "recover": {
+        "row": 12,
+        "frames": 3,
+        "fps": 7
+      }
     }
   },
   "knight": {
-    "file": "images/knight.png", "frame_width": 96, "frame_height": 96,
-    "frames": 4, "draw_width": 65, "draw_height": 65, "offset_y": 11,
+    "file": "images/knight.png",
+    "frame_width": 96,
+    "frame_height": 96,
+    "frames": 4,
+    "draw_width": 65,
+    "draw_height": 65,
+    "offset_y": 11,
     "animations": {
-      "approach": {"row": 0, "frames": 4, "fps": 7},
-      "tell": {"row": 4, "frames": 3, "fps": 6},
-      "charge": {"row": 8, "frames": 4, "fps": 14},
-      "weak": {"row": 16, "frames": 4, "fps": 8},
-      "recover": {"row": 20, "frames": 3, "fps": 6}
+      "approach": {
+        "row": 0,
+        "frames": 4,
+        "fps": 7
+      },
+      "tell": {
+        "row": 4,
+        "frames": 3,
+        "fps": 6
+      },
+      "charge": {
+        "row": 8,
+        "frames": 4,
+        "fps": 14
+      },
+      "weak": {
+        "row": 16,
+        "frames": 4,
+        "fps": 8
+      },
+      "recover": {
+        "row": 20,
+        "frames": 3,
+        "fps": 6
+      }
     }
   },
   "dragon": {
-    "file": "images/dragon.png", "frame_width": 192, "frame_height": 192,
-    "frames": 4, "draw_width": 105, "draw_height": 105, "offset_y": 16,
+    "file": "images/dragon.png",
+    "frame_width": 192,
+    "frame_height": 192,
+    "frames": 4,
+    "draw_width": 105,
+    "draw_height": 105,
+    "offset_y": 16,
     "animations": {
-      "approach": {"row": 0, "frames": 4, "fps": 5, "directions": false},
-      "stomp_tell": {"row": 1, "frames": 3, "fps": 5, "directions": false},
-      "stomp_attack": {"row": 2, "frames": 4, "fps": 12, "directions": false},
-      "breath_tell": {"row": 3, "frames": 3, "fps": 5, "directions": false},
-      "breath_attack": {"row": 4, "frames": 4, "fps": 12, "directions": false},
-      "weak": {"row": 5, "frames": 4, "fps": 8, "directions": false},
-      "recover": {"row": 6, "frames": 3, "fps": 6, "directions": false}
+      "approach": {
+        "row": 0,
+        "frames": 4,
+        "fps": 5,
+        "directions": false
+      },
+      "stomp_tell": {
+        "row": 1,
+        "frames": 3,
+        "fps": 5,
+        "directions": false
+      },
+      "stomp_attack": {
+        "row": 2,
+        "frames": 4,
+        "fps": 12,
+        "directions": false
+      },
+      "breath_tell": {
+        "row": 3,
+        "frames": 3,
+        "fps": 5,
+        "directions": false
+      },
+      "breath_attack": {
+        "row": 4,
+        "frames": 4,
+        "fps": 12,
+        "directions": false
+      },
+      "weak": {
+        "row": 5,
+        "frames": 4,
+        "fps": 8,
+        "directions": false
+      },
+      "recover": {
+        "row": 6,
+        "frames": 3,
+        "fps": 6,
+        "directions": false
+      }
     }
   },
-  "crystal": {"file": "images/crystal.png", "frame_width": 64, "frame_height": 64, "frames": 3},
-  "terminal": {"file": "images/terminal.png", "frame_width": 64, "frame_height": 64, "frames": 3},
-  "door": {"file": "images/door.png", "frame_width": 128, "frame_height": 96, "frames": 3},
-  "projectiles": {"file": "images/projectiles.png", "frame_width": 64, "frame_height": 64, "frames": 4},
-  "combat_fx": {"file": "images/combat_fx.png", "frame_width": 128, "frame_height": 128, "frames": 4},
-  "forest": {"file": "images/forest.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
-  "fortress": {"file": "images/fortress.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
-  "sanctuary": {"file": "images/sanctuary.png", "draw_width": 1040, "draw_height": 516, "offset_y": 0},
-  "ui_heart_full": {"file": "ui/heart_full.png"},
-  "ui_heart_empty": {"file": "ui/heart_empty.png"},
-  "ui_dash_ready": {"file": "ui/dash_ready.png"},
-  "ui_dash_cooldown": {"file": "ui/dash_cooldown.png"},
-  "ui_slash": {"file": "ui/slash.png"},
-  "ui_weapon_basic": {"file": "ui/weapon_basic.png"},
-  "ui_weapon_frost": {"file": "ui/weapon_frost.png"},
-  "ui_weapon_shatter": {"file": "ui/weapon_shatter.png"},
-  "ui_slot_normal": {"file": "ui/slot_normal.png"},
-  "ui_slot_selected": {"file": "ui/slot_selected.png"},
-  "ui_slot_locked": {"file": "ui/slot_locked.png"},
-  "ui_progress_frame": {"file": "ui/progress_frame.png"},
-  "ui_progress_fill": {"file": "ui/progress_fill.png"},
-  "ui_boss_frame": {"file": "ui/boss_frame.png"},
-  "ui_boss_fill": {"file": "ui/boss_fill.png"},
-  "ui_notice_panel": {"file": "ui/notice_panel.png"},
-  "ice_relic_test": {"file": "images/ice_relic_test.png"},
-  "fire_relic_test": {"file": "images/fire_relic_test.png"},
-  "fire_projectile": {"file": "images/fire_projectile.png"},
-  "obstacle_forest": {"file": "images/obstacle_forest.png"},
-  "obstacle_fortress": {"file": "images/obstacle_fortress.png"},
-  "obstacle_sanctuary": {"file": "images/obstacle_sanctuary.png"}
+  "crystal": {
+    "file": "images/crystal.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 3
+  },
+  "terminal": {
+    "file": "images/terminal.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 3
+  },
+  "door": {
+    "file": "images/door.png",
+    "frame_width": 128,
+    "frame_height": 96,
+    "frames": 3
+  },
+  "projectiles": {
+    "file": "images/projectiles.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frames": 4
+  },
+  "combat_fx": {
+    "file": "images/combat_fx.png",
+    "frame_width": 128,
+    "frame_height": 128,
+    "frames": 4
+  },
+  "forest": {
+    "file": "images/forest.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "fortress": {
+    "file": "images/fortress.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "sanctuary": {
+    "file": "images/sanctuary.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "ui_heart_full": {
+    "file": "ui/heart_full.png"
+  },
+  "ui_heart_empty": {
+    "file": "ui/heart_empty.png"
+  },
+  "ui_dash_ready": {
+    "file": "ui/dash_ready.png"
+  },
+  "ui_dash_cooldown": {
+    "file": "ui/dash_cooldown.png"
+  },
+  "ui_slash": {
+    "file": "ui/slash.png"
+  },
+  "ui_weapon_basic": {
+    "file": "ui/weapon_basic.png"
+  },
+  "ui_weapon_frost": {
+    "file": "ui/weapon_frost.png"
+  },
+  "ui_weapon_shatter": {
+    "file": "ui/weapon_shatter.png"
+  },
+  "ui_slot_normal": {
+    "file": "ui/slot_normal.png"
+  },
+  "ui_slot_selected": {
+    "file": "ui/slot_selected.png"
+  },
+  "ui_slot_locked": {
+    "file": "ui/slot_locked.png"
+  },
+  "ui_progress_frame": {
+    "file": "ui/progress_frame.png"
+  },
+  "ui_progress_fill": {
+    "file": "ui/progress_fill.png"
+  },
+  "ui_boss_frame": {
+    "file": "ui/boss_frame.png"
+  },
+  "ui_boss_fill": {
+    "file": "ui/boss_fill.png"
+  },
+  "ui_notice_panel": {
+    "file": "ui/notice_panel.png"
+  },
+  "ice_relic_test": {
+    "file": "images/ice_relic_test.png"
+  },
+  "fire_relic_test": {
+    "file": "images/fire_relic_test.png"
+  },
+  "fire_projectile": {
+    "file": "images/fire_projectile.png"
+  },
+  "obstacle_forest": {
+    "file": "images/obstacle_forest.png"
+  },
+  "obstacle_fortress": {
+    "file": "images/obstacle_fortress.png"
+  },
+  "obstacle_sanctuary": {
+    "file": "images/obstacle_sanctuary.png"
+  },
+  "hub_exit": {
+    "file": "campaign/1_hub/hub_exit.png"
+  },
+  "hub_forge": {
+    "file": "campaign/1_hub/hub_forge.png"
+  },
+  "hub_room": {
+    "file": "campaign/1_hub/hub_room.png"
+  },
+  "hub_storage_closed": {
+    "file": "campaign/1_hub/hub_storage_closed.png"
+  },
+  "hub_storage_open": {
+    "file": "campaign/1_hub/hub_storage_open.png"
+  },
+  "forge_button_disabled": {
+    "file": "campaign/2_forge_ui/forge_button_disabled.png"
+  },
+  "forge_button_hover": {
+    "file": "campaign/2_forge_ui/forge_button_hover.png"
+  },
+  "forge_button_normal": {
+    "file": "campaign/2_forge_ui/forge_button_normal.png"
+  },
+  "forge_glow": {
+    "file": "campaign/2_forge_ui/forge_glow.png"
+  },
+  "forge_panel": {
+    "file": "campaign/2_forge_ui/forge_panel.png"
+  },
+  "inventory_panel": {
+    "file": "campaign/3_inventory_ui/inventory_panel.png"
+  },
+  "arrow_bundle": {
+    "file": "campaign/4_items/arrow_bundle.png"
+  },
+  "dragon_core": {
+    "file": "campaign/4_items/dragon_core.png"
+  },
+  "ember_fragment": {
+    "file": "campaign/4_items/ember_fragment.png"
+  },
+  "fire_stone": {
+    "file": "campaign/4_items/fire_stone.png"
+  },
+  "flame_core": {
+    "file": "campaign/4_items/flame_core.png"
+  },
+  "fortress_key": {
+    "file": "campaign/4_items/fortress_key.png"
+  },
+  "frost_core": {
+    "file": "campaign/4_items/frost_core.png"
+  },
+  "fur_leather_coat": {
+    "file": "campaign/4_items/fur_leather_coat.png"
+  },
+  "healing_potion": {
+    "file": "campaign/4_items/healing_potion.png"
+  },
+  "heatproof_gloves": {
+    "file": "campaign/4_items/heatproof_gloves.png"
+  },
+  "ice_fragment": {
+    "file": "campaign/4_items/ice_fragment.png"
+  },
+  "ice_stone": {
+    "file": "campaign/4_items/ice_stone.png"
+  },
+  "magic_resist_amulet": {
+    "file": "campaign/4_items/magic_resist_amulet.png"
+  },
+  "throne_sigil": {
+    "file": "campaign/4_items/throne_sigil.png"
+  },
+  "frozen_gate": {
+    "file": "campaign/5_chests_gates/frozen_gate.png"
+  },
+  "jewel_chest_closed": {
+    "file": "campaign/5_chests_gates/jewel_chest_closed.png"
+  },
+  "jewel_chest_empty": {
+    "file": "campaign/5_chests_gates/jewel_chest_empty.png"
+  },
+  "jewel_chest_open": {
+    "file": "campaign/5_chests_gates/jewel_chest_open.png"
+  },
+  "supply_chest_closed": {
+    "file": "campaign/5_chests_gates/supply_chest_closed.png"
+  },
+  "supply_chest_open": {
+    "file": "campaign/5_chests_gates/supply_chest_open.png"
+  },
+  "thawed_gate": {
+    "file": "campaign/5_chests_gates/thawed_gate.png"
+  },
+  "arrow_fire": {
+    "file": "campaign/6_combat_vfx/arrow_fire.png"
+  },
+  "arrow_fire_impact": {
+    "file": "campaign/6_combat_vfx/arrow_fire_impact.png"
+  },
+  "arrow_fire_launch": {
+    "file": "campaign/6_combat_vfx/arrow_fire_launch.png"
+  },
+  "arrow_normal": {
+    "file": "campaign/6_combat_vfx/arrow_normal.png"
+  },
+  "ice_crystal_impact": {
+    "file": "campaign/6_combat_vfx/ice_crystal_impact.png"
+  },
+  "ice_crystal_projectile": {
+    "file": "campaign/6_combat_vfx/ice_crystal_projectile.png"
+  },
+  "fortress_burned_barracks": {
+    "file": "campaign/7_burned_fortress/fortress_burned_barracks.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "fortress_burned_boss": {
+    "file": "campaign/7_burned_fortress/fortress_burned_boss.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "fortress_burned_courtyard": {
+    "file": "campaign/7_burned_fortress/fortress_burned_courtyard.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "fortress_burned_outer": {
+    "file": "campaign/7_burned_fortress/fortress_burned_outer.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "obstacle_burned_cart": {
+    "file": "campaign/7_burned_fortress/obstacle_burned_cart.png"
+  },
+  "obstacle_charred_pillar": {
+    "file": "campaign/7_burned_fortress/obstacle_charred_pillar.png"
+  },
+  "frozen_land_blizzard": {
+    "file": "campaign/8_frozen_land/frozen_land_blizzard.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "frozen_land_boss": {
+    "file": "campaign/8_frozen_land/frozen_land_boss.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "frozen_land_entrance": {
+    "file": "campaign/8_frozen_land/frozen_land_entrance.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "frozen_land_valley": {
+    "file": "campaign/8_frozen_land/frozen_land_valley.png",
+    "draw_width": 1040,
+    "draw_height": 516,
+    "offset_y": 0
+  },
+  "obstacle_frozen_tree": {
+    "file": "campaign/8_frozen_land/obstacle_frozen_tree.png"
+  },
+  "obstacle_ice_boulder": {
+    "file": "campaign/8_frozen_land/obstacle_ice_boulder.png"
+  },
+  "obstacle_ice_wall": {
+    "file": "campaign/8_frozen_land/obstacle_ice_wall.png"
+  },
+  "map_burned_fort": {
+    "file": "campaign/10_world_map/map_burned_fort.png"
+  },
+  "map_cleared": {
+    "file": "campaign/10_world_map/map_cleared.png"
+  },
+  "map_current": {
+    "file": "campaign/10_world_map/map_current.png"
+  },
+  "map_dragon_castle": {
+    "file": "campaign/10_world_map/map_dragon_castle.png"
+  },
+  "map_forest": {
+    "file": "campaign/10_world_map/map_forest.png"
+  },
+  "map_frozen_land": {
+    "file": "campaign/10_world_map/map_frozen_land.png"
+  },
+  "world_map": {
+    "file": "campaign/10_world_map/world_map.png"
+  },
+  "fire_guardian_idle": {
+    "file": "campaign/bosses/fire_guardian_idle.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 5,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "fire_guardian_tell": {
+    "file": "campaign/bosses/fire_guardian_tell.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 3,
+    "fps": 4,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": false
+  },
+  "fire_guardian_charge": {
+    "file": "campaign/bosses/fire_guardian_charge.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 12,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "fire_guardian_stun": {
+    "file": "campaign/bosses/fire_guardian_stun.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 2,
+    "fps": 4,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "fire_guardian_death": {
+    "file": "campaign/bosses/fire_guardian_death.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 7,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": false
+  },
+  "ice_guardian_idle": {
+    "file": "campaign/bosses/ice_guardian_idle.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 5,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "ice_guardian_tell": {
+    "file": "campaign/bosses/ice_guardian_tell.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 3,
+    "fps": 4,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": false
+  },
+  "ice_guardian_charge": {
+    "file": "campaign/bosses/ice_guardian_charge.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 12,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "ice_guardian_stun": {
+    "file": "campaign/bosses/ice_guardian_stun.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 2,
+    "fps": 4,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": true
+  },
+  "ice_guardian_death": {
+    "file": "campaign/bosses/ice_guardian_death.png",
+    "frame_width": 256,
+    "frame_height": 256,
+    "frames": 4,
+    "fps": 7,
+    "draw_width": 94,
+    "draw_height": 94,
+    "offset_y": 15,
+    "direction_rows": {
+      "down": 0,
+      "left": 1,
+      "right": 2,
+      "up": 3
+    },
+    "loop": false
+  }
 }
