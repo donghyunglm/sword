@@ -19,8 +19,23 @@ class FakeImage:
     def clip_draw(self, *args):
         self.clip = args
 
+    def clip_composite_draw(self, *args):
+        self.clip = args
+
 
 class SpriteBankTests(unittest.TestCase):
+    def test_hero_left_uses_mirrored_right_frames_in_all_states(self):
+        config = json.loads((Path(__file__).resolve().parents[1] / 'assets/sprites.json').read_text(encoding='utf-8'))['player']
+        bank = SpriteBank.__new__(SpriteBank)
+        image = FakeImage()
+        bank.entries = {'player': (image, config, 64, 64, 6)}
+        for state, animation in config['animations'].items():
+            bank.draw('player', Vec(200, 200), 0, Vec(-1, 0), state)
+            self.assertEqual(image.clip[1], 1024 - (animation['row'] + 3) * 64)
+            self.assertEqual(image.clip[5], 'h')
+            bank.draw('player', Vec(200, 200), 0, Vec(1, 0), state)
+            self.assertEqual(len(image.clip), 8)
+
     def test_state_direction_and_frame_count(self):
         bank = SpriteBank.__new__(SpriteBank)
         image = FakeImage()

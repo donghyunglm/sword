@@ -34,6 +34,9 @@
         "frames": 5,
         "fps": 12
       }
+    },
+    "mirror_directions": {
+      "left": "right"
     }
   },
   "wolf": {

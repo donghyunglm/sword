@@ -51,6 +51,10 @@ class SpriteBank:
         facing = None
         if direction:
             facing = ("right" if direction.x > 0 else "left") if abs(direction.x) > abs(direction.y) else ("up" if direction.y > 0 else "down")
+        mirror_source = config.get("mirror_directions", {}).get(facing)
+        mirrored = mirror_source is not None
+        if mirrored:
+            facing = mirror_source
         animation = config.get("animations", {}).get(state)
         if animation is None:
             animation = config.get("animations", {}).get("idle")
@@ -78,8 +82,12 @@ class SpriteBank:
         if glow:
             from sdl2 import SDL_SetTextureBlendMode, SDL_BLENDMODE_ADD
             SDL_SetTextureBlendMode(image.texture, SDL_BLENDMODE_ADD)
-        image.clip_draw(frame * fw, bottom, fw, fh, pos.x,
-                        pos.y + float(config.get("offset_y", 8)), width, height)
+        if mirrored:
+            image.clip_composite_draw(frame * fw, bottom, fw, fh, 0, "h", pos.x,
+                                      pos.y + float(config.get("offset_y", 8)), width, height)
+        else:
+            image.clip_draw(frame * fw, bottom, fw, fh, pos.x,
+                            pos.y + float(config.get("offset_y", 8)), width, height)
         if glow:
             from sdl2 import SDL_BLENDMODE_BLEND
             SDL_SetTextureBlendMode(image.texture, SDL_BLENDMODE_BLEND)
