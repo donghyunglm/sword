@@ -6,6 +6,16 @@ from boss import Guardian
 
 
 class CombatTests(unittest.TestCase):
+    def test_aim_changes_immediately_without_update_even_during_dash(self):
+        c = Combat()
+        origin = c.player.pos
+        c.dash(Vec(1, 0))
+        for direction in (Vec(0, -1), Vec(-1, 0), Vec(0, 1), Vec(1, 0)):
+            c.aim_at(origin + direction * 100)
+            self.assertEqual(c.player.facing, direction)
+            self.assertEqual(c.player.pos, origin)
+            self.assertEqual(c.dash_direction, Vec(1, 0))
+
     def tick(self, c, seconds, move=Vec()):
         for _ in range(round(seconds * 120)):
             c.update(1 / 120, move)

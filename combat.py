@@ -54,6 +54,13 @@ class Combat:
     def counter_active(self):
         return self.counter_left > 0 and self.counter_charges > 0
 
+    def aim_at(self, target):
+        """조준은 물리 업데이트를 기다리지 않고 입력 즉시 반영한다."""
+        self.aim_target = target
+        offset = target - self.player.pos
+        if offset.length():
+            self.player.facing = offset.normalized()
+
     @property
     def skill_element(self):
         if self.counter_active:

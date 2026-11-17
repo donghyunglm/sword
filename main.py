@@ -7,6 +7,7 @@ import time
 
 import config as C
 from geometry import Vec
+from input_controls import mouse_position
 from campaign import CampaignGame as Game
 
 
@@ -209,6 +210,8 @@ def main(argv=None):
                 if game.mode == "play":
                     game.paused = True
             was_focused = focused
+            if focused and not args.smoke_test:
+                mouse_pos = mouse_position(engine.window)
             renderer.tick(dt if not game.paused else 0)
             for event in pico.get_events():
                 if event.type == pico.SDL_QUIT:
@@ -216,12 +219,16 @@ def main(argv=None):
                 elif event.type == pico.SDL_KEYUP:
                     pressed.discard(event.key)
                 elif event.type == pico.SDL_MOUSEMOTION:
-                    mouse_pos = Vec(event.x, C.HEIGHT - 1 - event.y)
+                    mouse_pos = mouse_position(engine.window)
+                    if game.mode in ("play", "hub") and not game.paused:
+                        game.combat.aim_at(mouse_pos)
                 elif event.type == pico.SDL_MOUSEWHEEL:
                     if game.mode == "play" and event.y:
                         game.cycle_item(1 if event.y < 0 else -1)
                 elif event.type == pico.SDL_MOUSEBUTTONDOWN:
-                    mouse_pos = Vec(event.x, C.HEIGHT - 1 - event.y)
+                    mouse_pos = mouse_position(engine.window)
+                    if game.mode in ("play", "hub") and not game.paused:
+                        game.combat.aim_at(mouse_pos)
                     if renderer.click(game, mouse_pos, event.button):
                         continue
                     if game.mode != "play":
@@ -357,9 +364,11 @@ def main(argv=None):
             accumulator += dt
             while accumulator >= C.FIXED_DT:
                 if not args.smoke_test:
-                    game.combat.aim_target = mouse_pos
+                    game.combat.aim_at(mouse_pos)
                     game.update(C.FIXED_DT, movement(pressed, pico))
                 accumulator -= C.FIXED_DT
+            if not args.smoke_test and game.mode in ("play", "hub") and not game.paused:
+                game.combat.aim_at(mouse_pos)
             for event, _ in game.combat.events:
                 audio.play(event)
             renderer.consume(game.combat.events)
