@@ -18,6 +18,11 @@ class ElementSkill:
         points = combat.trail.visible_points()
         if len(points) > 6:
             points = [points[round(i * (len(points) - 1) / 5)] for i in range(6)]
+        if combat.skill_element == "fire" and not bonus and combat.arrows is not None:
+            if combat.arrows < len(points):
+                combat.events.append(("no_arrows", combat.player.pos))
+                return False
+            combat.arrows -= len(points)
         # 마우스 조준은 각 잔영의 위치에서 클릭한 지점으로 향한다.
         # 키보드/자동 검증 호출은 기존 방향 지정도 사용할 수 있다.
         self.pending.extend((pos, (target - pos).normalized() if target is not None
@@ -44,6 +49,13 @@ class ElementSkill:
         survivors = []
         for bolt in self.bolts:
             old = bolt.pos
+            destination = bolt.pos + bolt.velocity * dt
+            gate = next((g for g in combat.shot_targets if not g.opened
+                         and path_hits([old, destination], g.pos, g.radius + bolt.radius)), None)
+            if gate is not None:
+                if gate.receive(bolt.kind):
+                    combat.events.append(("gate_melt", gate.pos))
+                continue
             if not bolt.update(dt, combat.arena):
                 combat.events.append(("element_" + bolt.kind, bolt.pos))
                 continue

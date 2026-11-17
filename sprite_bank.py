@@ -70,7 +70,7 @@ class SpriteBank:
             fps = max(0, float(config.get("fps", 8)))
         if row < 0 or (row + 1) * fh > image.h:
             row = 0
-        frame = int(time * fps) % frames
+        frame = int(time * fps) % frames if config.get("loop", True) else min(frames - 1, max(0, int(time * fps)))
         bottom = image.h - (row + 1) * fh
         width = float(config.get("draw_width", fw * 2)) * scale
         height = float(config.get("draw_height", fh * 2)) * scale

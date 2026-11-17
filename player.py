@@ -18,7 +18,7 @@ class Player:
 
     @property
     def speed(self):
-        return C.PLAYER_SPEED * (1 + self.upgrades["speed"] * 0.09)
+        return C.PLAYER_SPEED * (1 + self.upgrades["speed"] * 0.09) * getattr(self, "environment_speed", 1)
 
     @property
     def slash_radius(self):

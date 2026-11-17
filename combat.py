@@ -41,6 +41,9 @@ class Combat:
         self.element_skill = ElementSkill()
         self.aim_target = None
         self.dash_direction = None
+        self.arrows = None  # 기존 전투 테스트는 무제한, 새 모험은 화살 수량을 설정한다.
+        self.shot_targets = []
+        self.magic_damage = 1
         self.parry_left = self.parry_cooldown = 0.0
         self.counter_left = 0.0
         self.counter_charges = 0
@@ -347,6 +350,9 @@ class Combat:
             previous_state = enemy.state
             target = SimpleNamespace(pos=self.defend_pos) if self.defend_pos is not None and enemy.kind == "wolf" else p
             enemy.update(dt, target, self.arena, self.enemies)
+            if getattr(enemy, "shots", None):
+                self.projectiles.extend(enemy.shots)
+                enemy.shots.clear()
             if enemy.kind in ("guardian", "knight", "dragon") and enemy.state != previous_state:
                 if enemy.kind == "dragon" and enemy.state == "attack" and enemy.attack == "breath":
                     self.events.append(("boss_breath", enemy.pos))
@@ -407,6 +413,6 @@ class Combat:
         self.parry_left = max(0, self.parry_left - dt)
         for bullet in self.projectiles[:]:
             if p.pos.distance(bullet.pos) < p.radius + bullet.radius:
-                if p.hurt():
+                if p.hurt(1 if getattr(p, "magic_resistant", False) else self.magic_damage):
                     self.events.append(("hurt", p.pos))
                 self.projectiles.remove(bullet)

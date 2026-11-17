@@ -77,4 +77,13 @@ class Arena:
 
 
 def path_hits(points, target, radius):
-    return any(p.distance(target) <= radius for p in points)
+    if any(p.distance(target) <= radius for p in points):
+        return True
+    for a, b in zip(points, points[1:]):
+        delta = b - a
+        length2 = delta.x * delta.x + delta.y * delta.y
+        if length2:
+            t = max(0, min(1, ((target.x - a.x) * delta.x + (target.y - a.y) * delta.y) / length2))
+            if (a + delta * t).distance(target) <= radius:
+                return True
+    return False
