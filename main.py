@@ -279,11 +279,13 @@ def main(argv=None):
                         if key in (pico.SDLK_i, pico.SDLK_ESCAPE, pico.SDLK_TAB): game.toggle_inventory()
                         continue
                     if game.mode in ("hub", "forge", "map"):
-                        if key == pico.SDLK_ESCAPE: game.mode = "hub"
+                        if key == pico.SDLK_ESCAPE:
+                            if game.mode == 'forge': game.close_forge()
+                            else: game.mode = "hub"
                         elif key == pico.SDLK_i and game.mode == "hub": game.toggle_inventory()
                         elif key == pico.SDLK_e: game.interact()
                         elif game.mode == "forge":
-                            if key in (pico.SDLK_1, pico.SDLK_2): game.recipe_index = key - pico.SDLK_1
+                            if key in (pico.SDLK_1, pico.SDLK_2): game.choose_recipe(key - pico.SDLK_1)
                             elif key == pico.SDLK_RETURN: game.craft()
                         elif game.mode == "map":
                             if pico.SDLK_1 <= key <= pico.SDLK_4: game.map_region = key - pico.SDLK_1

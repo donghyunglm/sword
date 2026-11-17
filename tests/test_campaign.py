@@ -6,6 +6,11 @@ from geometry import Vec
 
 
 class CampaignTests(unittest.TestCase):
+    def stage_materials(self, game):
+        game.mode = 'forge'
+        for key in RECIPES[game.recipe_index]['cost']:
+            self.assertTrue(game.insert_forge_material(key))
+
     def game(self):
         game = CampaignGame('.cache/test-campaign-unused.json')
         game.trial = True
@@ -67,6 +72,7 @@ class CampaignTests(unittest.TestCase):
         recipe = RECIPES[0]
         self.assertFalse(game.craft())
         game.bag.update(recipe['cost'])
+        self.stage_materials(game)
         self.assertTrue(game.craft())
         self.assertFalse(game.craft())
         self.assertNotIn(recipe['result'], game.bag)
@@ -95,6 +101,7 @@ class CampaignTests(unittest.TestCase):
     def test_crafting_blocks_movement_and_survives_restore(self):
         game = self.game()
         game.bag.update(RECIPES[0]['cost'])
+        self.stage_materials(game)
         game.craft()
         origin = game.combat.player.pos
         game.update(2, Vec(1, 0))
@@ -116,6 +123,7 @@ class CampaignTests(unittest.TestCase):
         game = self.game()
         game.start_trial(0)
         game.enter_hub()
+        self.stage_materials(game)
         self.assertTrue(game.craft())
         game.update(5.01)
         origin = game.combat.player.pos
@@ -129,6 +137,7 @@ class CampaignTests(unittest.TestCase):
         game = self.game()
         game.start_trial(0)
         game.enter_hub()
+        self.stage_materials(game)
         game.craft()
         game.combat.player.pos = Vec(350, 430)
         self.assertFalse(game.combat.arena.valid(game.combat.player.pos, 14))

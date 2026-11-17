@@ -39,14 +39,20 @@ class CampaignGame(LegacyGame):
         self.pointer_pos = Vec()
         self.forge_job = None
         self.forge_drop = None
+        self.forge_inputs = {}
+        self.forge_last_click = None
 
     def snapshot(self, phase=None):
         phase = phase or self.mode
         if phase not in ("play", "transit", "victory"):
             phase = "hub"
+        saved_bag = dict(self.bag)
+        # 제작 전 등록 재료는 재실행 시 인벤토리로 돌아가도록 저장한다.
+        for key, count in self.forge_inputs.items():
+            saved_bag[key] = saved_bag.get(key, 0) + count
         return {"version": 2, "stage": self.index, "next_stage": self.next_stage, "phase": phase,
                 "hp": max(1, self.combat.player.hp), "weapon": self.combat.player.weapon,
-                "element": self.combat.element, "bag": dict(self.bag), "equipped": sorted(self.equipped),
+                "element": self.combat.element, "bag": saved_bag, "equipped": sorted(self.equipped),
                 "cleared": list(self.cleared), "collected": sorted(self.collected), "opened": sorted(self.opened),
                 "quickslots": list(self.quickslots), "forge_job": copy.deepcopy(self.forge_job),
                 "forge_drop": self.forge_drop}
@@ -62,6 +68,7 @@ class CampaignGame(LegacyGame):
             self.notice = "진행을 저장하지 못했습니다. 현재 모험은 계속할 수 있습니다."
 
     def _restore_bag(self, data):
+        self.forge_inputs, self.forge_last_click = {}, None
         self.bag = dict(data["bag"])
         self.equipped = set(data["equipped"])
         self.collected, self.opened = set(data["collected"]), set(data["opened"])
@@ -74,6 +81,7 @@ class CampaignGame(LegacyGame):
         self.forge_drop = data.get('forge_drop')
 
     def new_game(self):
+        self.forge_inputs, self.forge_last_click = {}, None
         self.forge_job = self.forge_drop = None
         self.quickslots = list(DEFAULT_SLOTS)
         self.training = self.trial = False
@@ -270,6 +278,7 @@ class CampaignGame(LegacyGame):
         self.persist()
 
     def enter_hub(self):
+        self.refund_forge_inputs()
         self.mode, self.paused, self.inventory_open, self.in_hub = "hub", False, False, True
         c = self.combat
         c.aim_target = None
@@ -305,6 +314,8 @@ class CampaignGame(LegacyGame):
             self.toggle_inventory()
             self.storage_open = True
         else:
+            if facility == 'forge':
+                self.refund_forge_inputs()
             self.mode = facility
             self.map_region = self.stages[min(14, self.next_stage)]["region"]
         return True
@@ -360,6 +371,51 @@ class CampaignGame(LegacyGame):
         self.combat.events.append(("open", self.combat.player.pos))
         return True
 
+    def refund_forge_inputs(self):
+        for key, count in self.forge_inputs.items():
+            self.bag[key] = self.bag.get(key, 0) + count
+        self.forge_inputs, self.forge_last_click = {}, None
+
+    def close_forge(self):
+        self.refund_forge_inputs()
+        self.mode = 'hub'
+        self.persist('hub')
+
+    def choose_recipe(self, index):
+        if index not in range(len(RECIPES)):
+            return False
+        if index != self.recipe_index:
+            self.refund_forge_inputs()
+            self.recipe_index = index
+            self.persist()
+        return True
+
+    def insert_forge_material(self, key):
+        if self.mode != 'forge' or self.forge_job or self.forge_drop:
+            return False
+        required = RECIPES[self.recipe_index]['cost'].get(key, 0)
+        count = min(max(0, required - self.forge_inputs.get(key, 0)), self.bag.get(key, 0))
+        if not count:
+            self.tell("필요한 재료가 아니거나 이미 필요한 수량을 채웠습니다.")
+            return False
+        self.bag[key] -= count
+        self.forge_inputs[key] = self.forge_inputs.get(key, 0) + count
+        self.tell(name(key) + f" {count}개를 제작 칸에 넣었습니다.")
+        self.persist()
+        return True
+
+    def forge_material_click(self, key, now):
+        previous = self.forge_last_click
+        self.forge_last_click = (key, now)
+        if previous and previous[0] == key and 0 <= now - previous[1] <= .35:
+            self.forge_last_click = None
+            return self.insert_forge_material(key)
+        return False
+
+    def forge_ready(self):
+        return not self.forge_job and not self.forge_drop and not self.bag.get(RECIPES[self.recipe_index]['result']) and all(
+            self.forge_inputs.get(key, 0) == count for key, count in RECIPES[self.recipe_index]['cost'].items())
+
     def craft(self):
         if self.forge_job or self.forge_drop:
             self.tell("제작 중이거나 바닥에 남은 원소석이 있습니다.")
@@ -369,11 +425,10 @@ class CampaignGame(LegacyGame):
         if self.bag.get(result):
             self.tell("이미 완성한 원소석입니다.")
             return False
-        if any(self.bag.get(k, 0) < v for k, v in recipe["cost"].items()):
-            self.tell("지역의 재료 상자와 보스 핵을 먼저 회수하세요.")
+        if not self.forge_ready():
+            self.tell("오른쪽 인벤토리의 재료를 더블클릭해 제작 칸을 채우세요.")
             return False
-        for key, count in recipe["cost"].items():
-            self.bag[key] -= count
+        self.forge_inputs, self.forge_last_click = {}, None
         self.forge_job = {'result': result, 'remaining': 5.0}
         self.mode, self.paused, self.inventory_open = 'hub', False, False
         self.combat.player.pos, self.combat.player.facing = Vec(380, 420), Vec(-1, 0)
@@ -444,6 +499,7 @@ class CampaignGame(LegacyGame):
     def start_trial(self, index):
         if not 0 <= index < len(self.stages):
             return False
+        self.forge_inputs, self.forge_last_click = {}, None
         self.forge_job = self.forge_drop = None
         self.quickslots = list(LEGACY_SLOTS)
         self.trial, self.training = True, False

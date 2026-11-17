@@ -1,5 +1,6 @@
 """새 모험의 거점·대장간·지도·인벤토리 화면과 입력 영역."""
 import math
+import time
 import pico2d as p
 from renderer import Renderer, rect, circle, WHITE, INK, GOLD, CYAN, MUTED
 from geometry import Vec
@@ -106,13 +107,18 @@ class CampaignRenderer(Renderer):
         recipe = RECIPES[game.recipe_index]
         for i, (key, count) in enumerate(recipe['cost'].items()):
             x = 350 + i * 195
-            self.image(key, x, 470, 70, 70)
+            loaded = game.forge_inputs.get(key, 0)
+            rect(x - 38, 432, 76, 76, CYAN if loaded else MUTED, filled=False)
+            if loaded:
+                self.image(key, x, 470, 70, 70)
+            else:
+                self.text('+', x - 12, 470, 32, MUTED)
             self.text(name(key), x - 55, 410, 18, WHITE)
-            self.text(f"{game.bag.get(key, 0)} / {count}", x - 20, 380, 20, GOLD)
-        self.text('제작 5초 후 바닥에 생성', 290, 325, 20)
+            self.text(f"{loaded} / {count}", x - 20, 380, 20, GOLD if loaded == count else MUTED)
+        self.text('재료를 더블클릭해 넣기', 290, 325, 20)
         self.text('완성된 원소석은 E로 획득', 290, 290, 18, MUTED)
-        rect(290, 210, 350, 65, CYAN, 80)
-        self.text('제작하기 · Enter', 355, 243, 26, GOLD)
+        rect(290, 210, 350, 65, CYAN if game.forge_ready() else MUTED, 80 if game.forge_ready() else 35)
+        self.text('제작하기 · Enter', 355, 243, 26, GOLD if game.forge_ready() else MUTED)
         for i, (kind, key) in enumerate(game.inventory_entries()):
             x, y = 747 + i % 4 * 86, 515 - i // 4 * 80
             self.shortcut_image(kind + ':' + key, x, y, 42)
@@ -230,8 +236,14 @@ class CampaignRenderer(Renderer):
                 if pos.distance(point) < 95: game.open_facility(key)
             return True
         if game.mode == 'forge':
-            if 80 < pos.x < 255 and 270 < pos.y < 540: game.recipe_index = 0 if pos.y > 400 else 1
+            if 80 < pos.x < 255 and 270 < pos.y < 540: game.choose_recipe(0 if pos.y > 400 else 1)
             elif 290 < pos.x < 640 and 210 < pos.y < 275: game.craft()
+            else:
+                for i, (kind, key) in enumerate(game.inventory_entries()):
+                    x, y = 747 + i % 4 * 86, 515 - i // 4 * 80
+                    if kind == 'item' and abs(pos.x - x) <= 36 and abs(pos.y - y) <= 35:
+                        game.forge_material_click(key, time.monotonic())
+                        break
             return True
         if game.mode == 'map':
             if 300 < pos.y < 520: game.map_region = max(0, min(3, round((pos.x - 180) / 250)))
