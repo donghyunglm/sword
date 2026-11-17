@@ -4,6 +4,20 @@ from geometry import Vec
 
 
 class ElementSkillTests(unittest.TestCase):
+    def test_fire_cooldown_is_2_5_seconds_and_ice_stays_3(self):
+        from afterimage import Trail
+        for element, expected in (('fire', 2.5), ('ice', 3.0)):
+            c = Combat()
+            c.element = element
+            c.trail = Trail(Vec(300, 200), Vec(1, 0), 3)
+            c.trail.record(Vec(450, 200))
+            self.assertTrue(c.element_skill.cast(c, Vec(0, 1)))
+            self.assertEqual(c.element_skill.cooldown, expected)
+            c.element_skill.update(expected - .01, c)
+            self.assertGreater(c.element_skill.cooldown, 0)
+            c.element_skill.update(.02, c)
+            self.assertEqual(c.element_skill.cooldown, 0)
+
     def test_cursor_aim_uses_each_echo_origin(self):
         c = Combat()
         from afterimage import Trail

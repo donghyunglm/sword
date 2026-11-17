@@ -30,7 +30,8 @@ class ElementSkill:
                             for pos in points)
         combat.trail = None
         combat.auto_echo_timer = None
-        self.timer, self.cooldown = 0.0, 3.0
+        self.timer = 0.0
+        self.cooldown = 2.5 if combat.skill_element == "fire" else 3.0
         if bonus:
             combat.counter_charges -= 1
             combat.player.cooldown = 0

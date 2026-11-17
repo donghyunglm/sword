@@ -35,7 +35,7 @@ class FinalDragonTests(unittest.TestCase):
             c.update(1 / 120)
         self.assertTrue(c.element_skill.cast(c, Vec(0, 1)))
         self.assertEqual(c.counter_charges, 0)
-        self.assertEqual(c.element_skill.cooldown, 3)
+        self.assertEqual(c.element_skill.cooldown, 2.5)
         self.assertFalse(c.element_skill.cast(c, Vec(0, 1)))
 
     def test_failed_parry_does_not_stun(self):
