@@ -37,6 +37,8 @@ class CampaignGame(LegacyGame):
         self.quickslots = list(DEFAULT_SLOTS)
         self.drag = None
         self.pointer_pos = Vec()
+        self.forge_job = None
+        self.forge_drop = None
 
     def snapshot(self, phase=None):
         phase = phase or self.mode
@@ -46,7 +48,8 @@ class CampaignGame(LegacyGame):
                 "hp": max(1, self.combat.player.hp), "weapon": self.combat.player.weapon,
                 "element": self.combat.element, "bag": dict(self.bag), "equipped": sorted(self.equipped),
                 "cleared": list(self.cleared), "collected": sorted(self.collected), "opened": sorted(self.opened),
-                "quickslots": list(self.quickslots)}
+                "quickslots": list(self.quickslots), "forge_job": copy.deepcopy(self.forge_job),
+                "forge_drop": self.forge_drop}
 
     def persist(self, phase=None):
         if self.training or self.trial:
@@ -67,8 +70,11 @@ class CampaignGame(LegacyGame):
         self.combat.element = data.get("element")
         self.next_stage = data["next_stage"]
         self.quickslots = list(data.get("quickslots", LEGACY_SLOTS))
+        self.forge_job = copy.deepcopy(data.get('forge_job'))
+        self.forge_drop = data.get('forge_drop')
 
     def new_game(self):
+        self.forge_job = self.forge_drop = None
         self.quickslots = list(DEFAULT_SLOTS)
         self.training = self.trial = False
         self.bag = {"healing_potion": 2}
@@ -175,7 +181,7 @@ class CampaignGame(LegacyGame):
         if self.mode not in ("play", "hub", "forge", "map") or (self.paused and not self.inventory_open):
             return False
         if element not in self.owned_elements:
-            self.tell("대장간에서 원소석을 먼저 합성하세요.")
+            self.tell("대장간에서 원소석을 먼저 제작하세요.")
             return False
         self.combat.element = element
         self.persist()
@@ -269,6 +275,8 @@ class CampaignGame(LegacyGame):
         c.player.facing = Vec(0, -1)
         c.player.environment_speed = 1
         c.player.pos, c.player.hp = Vec(560, 285), C.MAX_HP
+        if self.forge_job:
+            c.player.pos, c.player.facing = Vec(350, 430), Vec(-1, 0)
         c.enemies, c.devices, c.projectiles, c.slashes = [], [], [], []
         c.trail = None
         c.element_skill.pending.clear()
@@ -278,9 +286,14 @@ class CampaignGame(LegacyGame):
                          Rect(460, 565, 145, 70), Rect(995, 300, 70, 210), Rect(805, 575, 245, 75)])
         c.arena.bounds = Rect(75, 90, 980, 565)
         self.corpses = []
+        if 'presentation:forge_materials' not in self.collected:
+            self.give({'ember_fragment': 3, 'flame_core': 1}, 'presentation:forge_materials')
         self.persist("hub")
 
     def open_facility(self, facility, require_near=True):
+        if self.forge_job:
+            self.tell("제작이 끝날 때까지 잠시 기다려 주세요.")
+            return False
         if self.mode != "hub" or self.inventory_open:
             return False
         entry = next((f for f in HUB_FACILITIES if f[0] == facility), None)
@@ -299,6 +312,17 @@ class CampaignGame(LegacyGame):
         if self.paused:
             return False
         if self.mode == "hub":
+            if self.forge_drop and self.combat.player.pos.distance(Vec(370, 390)) < 85:
+                result = self.forge_drop
+                self.forge_drop = None
+                self.give({result: 1}, 'forge:' + result)
+                element = result.removesuffix('_stone')
+                if element not in self.owned_elements:
+                    self.owned_elements.append(element)
+                self.combat.element = element
+                self.tell(name(result) + " 획득! I에서 숫자 슬롯에 등록할 수 있습니다.", 5)
+                self.persist('hub')
+                return True
             facility = min(HUB_FACILITIES, key=lambda f: self.combat.player.pos.distance(f[1]))
             return self.open_facility(facility[0])
         if self.mode != "play":
@@ -336,6 +360,9 @@ class CampaignGame(LegacyGame):
         return True
 
     def craft(self):
+        if self.forge_job or self.forge_drop:
+            self.tell("제작 중이거나 바닥에 남은 원소석이 있습니다.")
+            return False
         recipe = RECIPES[self.recipe_index]
         result = recipe["result"]
         if self.bag.get(result):
@@ -346,12 +373,11 @@ class CampaignGame(LegacyGame):
             return False
         for key, count in recipe["cost"].items():
             self.bag[key] -= count
-        self.bag[result] = 1
-        self.owned_elements.append(recipe["element"])
-        self.combat.element = recipe["element"]
-        self.forge_flash = 1.1
-        self.combat.events.append(("open", Vec(550, 350)))
-        self.tell(name(result) + " 완성! 원소 슬롯에 장착했습니다.", 5)
+        self.forge_job = {'result': result, 'remaining': 5.0}
+        self.mode, self.paused, self.inventory_open = 'hub', False, False
+        self.combat.player.pos, self.combat.player.facing = Vec(350, 430), Vec(-1, 0)
+        self.combat.player.moving = False
+        self.tell("제작 중 · 5초 동안 원소석을 다듬습니다.", 5)
         self.persist("hub")
         return True
 
@@ -361,9 +387,9 @@ class CampaignGame(LegacyGame):
         if region and REGIONS[region - 1]["end"] not in self.cleared:
             return "이전 지역의 보스를 먼저 쓰러뜨리세요."
         if region >= 2 and not self.bag.get("fire_stone"):
-            return "대장간에서 불의 돌을 먼저 합성하세요."
+            return "대장간에서 불의 돌을 먼저 제작하세요."
         if region >= 3 and not self.bag.get("ice_stone"):
-            return "대장간에서 얼음의 돌을 먼저 합성하세요."
+            return "대장간에서 얼음의 돌을 먼저 제작하세요."
         if all(i in self.cleared for i in range(REGIONS[region]["start"], REGIONS[region]["end"] + 1)):
             return "완료한 지역입니다."
         return ""
@@ -417,6 +443,7 @@ class CampaignGame(LegacyGame):
     def start_trial(self, index):
         if not 0 <= index < len(self.stages):
             return False
+        self.forge_job = self.forge_drop = None
         self.quickslots = list(LEGACY_SLOTS)
         self.trial, self.training = True, False
         self.bag, self.equipped, self.collected, self.opened = {"healing_potion": 3, "arrow_bundle": 80}, set(), set(), set()
@@ -448,6 +475,16 @@ class CampaignGame(LegacyGame):
             return
         if self.mode == "hub":
             p = self.combat.player
+            if self.forge_job:
+                self.forge_job['remaining'] = max(0, self.forge_job['remaining'] - dt)
+                p.moving = False
+                if self.forge_job['remaining'] <= 0:
+                    self.forge_drop = self.forge_job['result']
+                    self.forge_job = None
+                    self.combat.events.append(('open', Vec(370, 390)))
+                    self.tell("제작 완료! 바닥의 " + name(self.forge_drop) + "을 E로 획득하세요.", 6)
+                    self.persist('hub')
+                return
             if movement.length():
                 p.pos, _ = self.combat.arena.move(p.pos, movement.normalized() * (p.speed * dt), p.radius)
                 p.facing = movement.normalized()

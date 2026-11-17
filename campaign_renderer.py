@@ -1,6 +1,7 @@
 """새 모험의 거점·대장간·지도·인벤토리 화면과 입력 영역."""
+import math
 import pico2d as p
-from renderer import Renderer, rect, WHITE, INK, GOLD, CYAN, MUTED
+from renderer import Renderer, rect, line, circle, polygon, WHITE, INK, GOLD, CYAN, MUTED
 from geometry import Vec
 from campaign import HUB_FACILITIES
 from campaign_data import REGIONS
@@ -15,7 +16,7 @@ class CampaignRenderer(Renderer):
     def title(self, game):
         super().title(game)
         rect(80, 120, 980, 32, INK)
-        self.text("4개 지역 · 재료 탐험 · 거점 합성 · 용을 향한 복수", 92, 137, 18, GOLD)
+        self.text("4개 지역 · 재료 탐험 · 거점 제작 · 용을 향한 복수", 92, 137, 18, GOLD)
 
     def floor(self, game):
         rect(0, 0, 1120, 760, INK)
@@ -45,11 +46,20 @@ class CampaignRenderer(Renderer):
             self.image('hub_storage_closed', 850, 355, 120, 105)
             self.actor('player', game.combat.player.pos, game.combat.player.facing,
                        'walk' if game.combat.player.moving else 'idle')
+            if game.forge_job: self.forging(game)
+            if game.forge_drop:
+                pos = Vec(370, 390)
+                circle(pos, 24, GOLD, 70, True)
+                self.image(game.forge_drop, pos.x, pos.y + 5 + math.sin(self.visual_time * 3) * 3, 48, 48)
+                self.text('E ' + name(game.forge_drop), 335, 350, 16, GOLD)
             rect(0, 670, 1120, 90, INK, 225)
             self.center('여정의 거점', 720, 32, GOLD)
             for key, pos, label in HUB_FACILITIES:
-                self.text(label + ' · E / 클릭', pos.x - 65, pos.y - (35 if key == 'map' else 70), 18, GOLD)
+                if game.mode == 'hub' and (key != 'map' or game.toast_left <= 0):
+                    self.text(label + ' · E / 클릭', pos.x - 65, pos.y - (35 if key == 'map' else 70), 18, GOLD)
             self.center('WASD 이동 · 시설 가까이에서 E 또는 클릭 · I 인벤토리', 38, 18)
+            if game.mode == 'hub' and game.toast_left > 0:
+                self.center(game.toast, 85, 16, GOLD)
             if game.mode == 'forge': self.forge(game)
             if game.mode == 'map': self.world_map(game)
         elif game.mode == 'transit':
@@ -76,24 +86,59 @@ class CampaignRenderer(Renderer):
                 self.center('일시 정지 · Enter 계속 · R 재도전 · Q 타이틀', 380, 23)
         if game.inventory_open: self.inventory(game)
 
+    def forging(self, game):
+        elapsed = 5 - game.forge_job['remaining']
+        phase = (elapsed * 2) % 1
+        # 손에서 망치 머리까지 연결해 캐릭터가 직접 작업하는 모양을 표시한다.
+        hand = game.combat.player.pos + Vec(-12, 22)
+        angle = math.radians(100 + 70 * min(1, phase / .65))
+        head = hand + Vec(math.cos(angle), math.sin(angle)) * 39
+        for offset in (-1, 0, 1):
+            line(hand + Vec(offset, 0), head + Vec(offset, 0), (170, 119, 67))
+        circle(hand, 4, (226, 194, 151), 255, True)
+        side = Vec(-math.sin(angle), math.cos(angle))
+        along = Vec(math.cos(angle), math.sin(angle))
+        polygon([head + side * a + along * b for a,b in ((-11,-6),(11,-6),(11,6),(-11,6))], (196, 207, 215))
+        line(head - side * 10, head + side * 10, GOLD)
+        if phase > .65:
+            hit = Vec(306, 457)
+            for i in range(7):
+                angle2 = i * .8 + elapsed * 2
+                end = hit + Vec(math.cos(angle2), abs(math.sin(angle2))) * (9 + (phase-.65)*45)
+                line(hit, end, GOLD, int(255 * (1-phase)/.35))
+        rect(310, 505, 140, 9, INK)
+        rect(312, 507, 136 * elapsed / 5, 5, GOLD)
+        self.text(f"제작 중 {game.forge_job['remaining']:.1f}초", 310, 533, 18, GOLD)
+
     def forge(self, game):
         self.shade()
-        rect(65, 125, 990, 525, INK)
-        self.center('대장간 · 모은 재료로 원소석 합성', 610, 32, GOLD)
+        rect(50, 125, 635, 525, INK)
+        rect(700, 125, 370, 525, INK)
+        self.text('대장간 · 원소석 제작', 90, 605, 26, GOLD)
+        self.text('인벤토리', 800, 605, 26, GOLD)
         for i, recipe in enumerate(RECIPES):
-            y = 475 - i * 160
-            rect(100, y - 60, 260, 125, CYAN if i == game.recipe_index else MUTED, 100)
-            self.image(recipe['result'], 155, y, 70, 70)
-            self.text(f"{i+1}. {name(recipe['result'])}", 205, y, 23)
+            y = 475 - i * 150
+            rect(80, y - 55, 175, 120, CYAN if i == game.recipe_index else MUTED, 85)
+            self.image(recipe['result'], 122, y + 10, 60, 60)
+            self.text(f"{i+1}. {name(recipe['result'])}", 95, y - 35, 18)
         recipe = RECIPES[game.recipe_index]
         for i, (key, count) in enumerate(recipe['cost'].items()):
-            self.image(key, 460 + i * 235, 460, 85, 85)
-            self.text(f"{name(key)} {game.bag.get(key, 0)}/{count}", 400 + i * 235, 390, 20, GOLD)
-        self.text('잔영에서 원거리 공격을 발사합니다.', 410, 310, 20)
-        rect(425, 200, 390, 65, CYAN, 80)
-        self.text('합성하기 · Enter', 500, 236, 26, GOLD)
-        self.center('1 / 2 선택 · Esc 거점으로', 165, 18)
-        if game.toast_left > 0: self.center(game.toast, 90, 18, GOLD)
+            x = 350 + i * 195
+            self.image(key, x, 470, 70, 70)
+            self.text(name(key), x - 55, 410, 18, WHITE)
+            self.text(f"{game.bag.get(key, 0)} / {count}", x - 20, 380, 20, GOLD)
+        self.text('망치질 5초 후 바닥에 생성', 290, 325, 20)
+        self.text('완성된 원소석은 E로 획득', 290, 290, 18, MUTED)
+        rect(290, 210, 350, 65, CYAN, 80)
+        self.text('제작하기 · Enter', 355, 243, 26, GOLD)
+        for i, (kind, key) in enumerate(game.inventory_entries()):
+            x, y = 747 + i % 4 * 86, 515 - i // 4 * 80
+            self.shortcut_image(kind + ':' + key, x, y, 42)
+            label = name(key) if kind == 'item' else {'1': '기본 검', '2': '냉기 검', '3': '파쇄 검'}[key]
+            self.text(label, x - 36, y - 30, 14, GOLD)
+            if kind == 'item': self.text(str(game.bag[key]), x + 20, y - 8, 14)
+        self.center('1 / 2 제작 선택 · Esc 거점으로', 165, 18)
+        if game.toast_left > 0: self.center(game.toast, 90, 16, GOLD)
 
     def world_map(self, game):
         self.shade()
@@ -154,7 +199,7 @@ class CampaignRenderer(Renderer):
             label = name(key) + ' ' + str(game.bag[key]) if kind == 'item' else {'1': '기본 검', '2': '냉기 검', '3': '파쇄 검'}[key]
             self.text(label, x - 55, y - 58, 14, GOLD)
         self.center('I / Esc 닫기 · 슬롯끼리 드래그하면 교환 · 슬롯 우클릭은 등록 해제', 145, 16)
-        self.center('장비는 클릭해 착용 · 재료는 대장간에서 합성', 115, 16, MUTED)
+        self.center('장비는 클릭해 착용 · 재료는 대장간에서 제작', 115, 16, MUTED)
         if game.drag:
             pos = game.pointer_pos
             self.ui('slot_selected', pos.x, pos.y, 60, 60)
@@ -203,8 +248,8 @@ class CampaignRenderer(Renderer):
                 if pos.distance(point) < 95: game.open_facility(key)
             return True
         if game.mode == 'forge':
-            if 100 < pos.x < 360: game.recipe_index = 0 if pos.y > 395 else 1
-            elif 425 < pos.x < 815 and 200 < pos.y < 265: game.craft()
+            if 80 < pos.x < 255 and 270 < pos.y < 540: game.recipe_index = 0 if pos.y > 400 else 1
+            elif 290 < pos.x < 640 and 210 < pos.y < 275: game.craft()
             return True
         if game.mode == 'map':
             if 300 < pos.y < 520: game.map_region = max(0, min(3, round((pos.x - 180) / 250)))

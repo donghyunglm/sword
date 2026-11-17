@@ -18,6 +18,14 @@ def validate(data):
     if data.get("phase") not in ("hub", "play", "transit", "victory"):
         raise ValueError("장면 정보가 올바르지 않습니다.")
     bag = data.get("bag")
+    products = ('fire_stone', 'ice_stone')
+    job = data.get('forge_job')
+    if job is not None and (not isinstance(job, dict) or job.get('result') not in products
+                            or type(job.get('remaining')) not in (int, float)
+                            or not 0 <= job['remaining'] <= 5):
+        raise ValueError("제작 정보가 올바르지 않습니다.")
+    if data.get('forge_drop') is not None and data['forge_drop'] not in products:
+        raise ValueError("제작 전리품 정보가 올바르지 않습니다.")
     slots = data.get('quickslots')
     if slots is not None and (not isinstance(slots, list) or len(slots) != 5
                               or any(token is not None and token not in ASSIGNABLE for token in slots)
