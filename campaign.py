@@ -200,6 +200,8 @@ class CampaignGame(LegacyGame):
     def enter_hub(self):
         self.mode, self.paused, self.inventory_open, self.in_hub = "hub", False, False, True
         c = self.combat
+        c.aim_target = None
+        c.player.facing = Vec(0, -1)
         c.player.environment_speed = 1
         c.player.pos, c.player.hp = Vec(560, 285), C.MAX_HP
         c.enemies, c.devices, c.projectiles, c.slashes = [], [], [], []
@@ -382,12 +384,7 @@ class CampaignGame(LegacyGame):
             p = self.combat.player
             if movement.length():
                 p.pos, _ = self.combat.arena.move(p.pos, movement.normalized() * (p.speed * dt), p.radius)
-                if self.combat.aim_target is None:
-                    p.facing = movement.normalized()
-            if self.combat.aim_target is not None:
-                aim = self.combat.aim_target - p.pos
-                if aim.length():
-                    p.facing = aim.normalized()
+                p.facing = movement.normalized()
             p.moving = movement.length() > 0
             return
         if self.mode != "play":
