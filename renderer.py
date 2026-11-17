@@ -39,9 +39,38 @@ def line(a, b, color, alpha=255):
     p.draw_line(int(a.x), int(a.y), int(b.x), int(b.y), *color, alpha)
 
 
+def polygon(points, color):
+    """작은 HUD 아이콘용 채움. 외부 이미지 없이 해상도에 맞춰 그린다."""
+    for y in range(int(min(v.y for v in points)), int(max(v.y for v in points)) + 1):
+        crossings = []
+        for a, b in zip(points, points[1:] + points[:1]):
+            if (a.y <= y < b.y) or (b.y <= y < a.y):
+                crossings.append(a.x + (y - a.y) * (b.x - a.x) / (b.y - a.y))
+        crossings.sort()
+        for left, right in zip(crossings[::2], crossings[1::2]):
+            line(Vec(left, y), Vec(right, y), color)
+
+
+def parry_icon(center, active=False, cooldown=False):
+    """방패에 부딪힌 검과 섬광으로 패링을 표현한다."""
+    circle(center, 26, (17, 35, 46), 255, True)
+    circle(center, 25, GOLD if active else (116, 142, 155), 255)
+    def shape(coords, color):
+        polygon([center + Vec(x, y) for x, y in coords], color)
+    edge = MUTED if cooldown else GOLD
+    shape([(-17, 12), (-5, 18), (7, 12), (5, -4), (-5, -17), (-15, -5)], edge)
+    shape([(-14, 10), (-5, 14), (4, 10), (2, -3), (-5, -12), (-12, -3)], (32, 75, 93))
+    line(center + Vec(-5, 10), center + Vec(-5, -8), CYAN)
+    shape([(3, -6), (7, -9), (21, 12), (21, 21), (14, 17)], WHITE if not cooldown else MUTED)
+    shape([(1, -12), (12, -4), (14, -7), (3, -15)], edge)
+    shape([(2, -13), (-4, -20), (-1, -22), (5, -15)], (141, 105, 58))
+    shape([(7, 6), (9, 13), (12, 9), (18, 10), (13, 5), (14, 0), (9, 3), (5, 0)], CYAN if not active else GOLD)
+
+
 class Renderer:
     def __init__(self):
-        font_candidates = [Path("C:/Windows/Fonts/malgun.ttf"), Path("C:/Windows/Fonts/arial.ttf"),
+        font_candidates = [Path("C:/Windows/Fonts/HanSantteutDotum-Bold.ttf"),
+                           Path("C:/Windows/Fonts/malgunbd.ttf"), Path("C:/Windows/Fonts/arialbd.ttf"),
                            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")]
         self.font_path = next((str(f) for f in font_candidates if f.exists()), None)
         if self.font_path is None:
@@ -59,6 +88,7 @@ class Renderer:
         self.grass = [(rng.randint(55, 1064), rng.randint(119, 613), rng.randrange(3)) for _ in range(180)]
 
     def text(self, message, x, y, size=20, color=WHITE):
+        self.fonts[size].draw(x + 1, y - 1, str(message), (3, 8, 14))
         self.fonts[size].draw(x, y, str(message), color)
 
     def ui(self, name, x, y, width, height, alpha=1):
@@ -557,7 +587,8 @@ class Renderer:
                     self.ui(("weapon_basic", "weapon_frost", "weapon_shatter")[slot], x, 608, 39, 39)
                 else:
                     self.bank.draw_cell(("ice" if slot == 3 else "fire") + "_relic_test", 0, 0, Vec(x, 608), 72, 48)
-            self.text(str(slot + 1), x - 23, 624, 14, GOLD if selected else MUTED)
+            rect(x - 17, 609, 17, 17, (9, 17, 27), 245)
+            self.text(str(slot + 1), x - 13, 617, 14, GOLD if selected else WHITE)
         rect(0, 654, C.WIDTH, 106, (9, 17, 27), 245)
         rect(0, 652, C.WIDTH, 2, (68, 98, 107))
         self.text("HP", 32, 722, 16, MUTED)
@@ -604,9 +635,7 @@ class Renderer:
         self.ui("slash", 260, 39, 59, 59)
         self.text("F", 300, 44, 20, GOLD)
         self.text("기본 검격", 300, 22, 16, WHITE)
-        circle(Vec(460, 39), 22, SOUL if (game.index == 15 or getattr(game, "modern_combat", False)) else MUTED, 165)
-        line(Vec(447, 39), Vec(460, 22), SOUL, 180)
-        line(Vec(460, 22), Vec(475, 52), SOUL, 180)
+        parry_icon(Vec(460, 39), active=c.parry_left > 0, cooldown=c.parry_cooldown > 0)
         self.text("우클릭", 495, 44, 18, SOUL)
         self.text("패링" if (game.index == 15 or getattr(game, "modern_combat", False)) else "3-6 패링", 495, 22, 16, WHITE if (game.index == 15 or getattr(game, "modern_combat", False)) else MUTED)
         self.ui("slot_normal", 650, 40, 63, 63)
