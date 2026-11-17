@@ -46,7 +46,21 @@ class CampaignTests(unittest.TestCase):
         game.update(0.02)
         self.assertGreater(combat.player.pos.y, origin.y)
         self.assertAlmostEqual(combat.player.pos.x, origin.x)
-        self.assertGreater(combat.player.facing.x, 0.9)
+        self.assertEqual(combat.player.facing, Vec(0, 1))
+
+    def test_every_round_faces_movement_despite_opposite_mouse(self):
+        game = self.game()
+        for index in range(15):
+            game.start_trial(index)
+            combat = game.combat
+            for direction in (Vec(-1, 0), Vec(0, 1), Vec(1, 0), Vec(0, -1)):
+                combat.aim_at(combat.player.pos - direction * 200)
+                game.update(.01, direction)
+                # 메인 루프가 렌더 직전 마우스 좌표를 갱신해도 회전하지 않는다.
+                combat.aim_at(combat.player.pos - direction * 200)
+                self.assertEqual(combat.player.facing, direction, (index, direction))
+                game.update(.01)
+                self.assertEqual(combat.player.facing, direction)
 
     def test_crafting_consumes_materials_once(self):
         game = self.game()
@@ -97,6 +111,29 @@ class CampaignTests(unittest.TestCase):
         validate(data)
         game._restore_bag(data)
         self.assertEqual(game.forge_drop, 'fire_stone')
+
+    def test_can_walk_in_all_directions_after_crafting(self):
+        game = self.game()
+        game.start_trial(0)
+        game.enter_hub()
+        self.assertTrue(game.craft())
+        game.update(5.01)
+        origin = game.combat.player.pos
+        self.assertTrue(game.combat.arena.valid(origin, game.combat.player.radius))
+        for direction in (Vec(-1, 0), Vec(0, 1), Vec(1, 0), Vec(0, -1)):
+            game.combat.player.pos = origin
+            game.update(.04, direction)
+            self.assertGreater(game.combat.player.pos.distance(origin), 8)
+
+    def test_old_forge_position_is_unstuck_when_crafting_finishes(self):
+        game = self.game()
+        game.start_trial(0)
+        game.enter_hub()
+        game.craft()
+        game.combat.player.pos = Vec(350, 430)
+        self.assertFalse(game.combat.arena.valid(game.combat.player.pos, 14))
+        game.update(5.01)
+        self.assertTrue(game.combat.arena.valid(game.combat.player.pos, 14))
 
 
 if __name__ == '__main__':

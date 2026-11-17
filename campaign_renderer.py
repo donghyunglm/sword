@@ -1,7 +1,7 @@
 """새 모험의 거점·대장간·지도·인벤토리 화면과 입력 영역."""
 import math
 import pico2d as p
-from renderer import Renderer, rect, line, circle, polygon, WHITE, INK, GOLD, CYAN, MUTED
+from renderer import Renderer, rect, circle, WHITE, INK, GOLD, CYAN, MUTED
 from geometry import Vec
 from campaign import HUB_FACILITIES
 from campaign_data import REGIONS
@@ -88,24 +88,6 @@ class CampaignRenderer(Renderer):
 
     def forging(self, game):
         elapsed = 5 - game.forge_job['remaining']
-        phase = (elapsed * 2) % 1
-        # 손에서 망치 머리까지 연결해 캐릭터가 직접 작업하는 모양을 표시한다.
-        hand = game.combat.player.pos + Vec(-12, 22)
-        angle = math.radians(100 + 70 * min(1, phase / .65))
-        head = hand + Vec(math.cos(angle), math.sin(angle)) * 39
-        for offset in (-1, 0, 1):
-            line(hand + Vec(offset, 0), head + Vec(offset, 0), (170, 119, 67))
-        circle(hand, 4, (226, 194, 151), 255, True)
-        side = Vec(-math.sin(angle), math.cos(angle))
-        along = Vec(math.cos(angle), math.sin(angle))
-        polygon([head + side * a + along * b for a,b in ((-11,-6),(11,-6),(11,6),(-11,6))], (196, 207, 215))
-        line(head - side * 10, head + side * 10, GOLD)
-        if phase > .65:
-            hit = Vec(306, 457)
-            for i in range(7):
-                angle2 = i * .8 + elapsed * 2
-                end = hit + Vec(math.cos(angle2), abs(math.sin(angle2))) * (9 + (phase-.65)*45)
-                line(hit, end, GOLD, int(255 * (1-phase)/.35))
         rect(310, 505, 140, 9, INK)
         rect(312, 507, 136 * elapsed / 5, 5, GOLD)
         self.text(f"제작 중 {game.forge_job['remaining']:.1f}초", 310, 533, 18, GOLD)
@@ -127,7 +109,7 @@ class CampaignRenderer(Renderer):
             self.image(key, x, 470, 70, 70)
             self.text(name(key), x - 55, 410, 18, WHITE)
             self.text(f"{game.bag.get(key, 0)} / {count}", x - 20, 380, 20, GOLD)
-        self.text('망치질 5초 후 바닥에 생성', 290, 325, 20)
+        self.text('제작 5초 후 바닥에 생성', 290, 325, 20)
         self.text('완성된 원소석은 E로 획득', 290, 290, 18, MUTED)
         rect(290, 210, 350, 65, CYAN, 80)
         self.text('제작하기 · Enter', 355, 243, 26, GOLD)

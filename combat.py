@@ -40,6 +40,7 @@ class Combat:
         self.element = None
         self.element_skill = ElementSkill()
         self.aim_target = None
+        self.movement_facing = False
         self.dash_direction = None
         self.arrows = None  # 기존 전투 테스트는 무제한, 새 모험은 화살 수량을 설정한다.
         self.shot_targets = []
@@ -58,7 +59,7 @@ class Combat:
         """조준은 물리 업데이트를 기다리지 않고 입력 즉시 반영한다."""
         self.aim_target = target
         offset = target - self.player.pos
-        if offset.length():
+        if offset.length() and not self.movement_facing:
             self.player.facing = offset.normalized()
 
     @property
@@ -117,6 +118,8 @@ class Combat:
         if self.counter_active:
             p.cooldown = 0
         self.dash_direction = (direction if direction is not None and direction.length() else p.facing).normalized()
+        if self.movement_facing:
+            p.facing = self.dash_direction
         p.dash_left = C.DASH_TIME
         if self.dual_mode:
             self.echo_pos, self.echo_remaining = p.pos, p.trail_lifetime
@@ -311,7 +314,12 @@ class Combat:
     def update(self, dt, movement=Vec()):
         self.elapsed += dt
         p = self.player
-        if self.aim_target is not None and (self.aim_target - p.pos).length():
+        if self.movement_facing:
+            if p.dash_left > 0 and self.dash_direction is not None:
+                p.facing = self.dash_direction
+            elif movement.length():
+                p.facing = movement.normalized()
+        elif self.aim_target is not None and (self.aim_target - p.pos).length():
             p.facing = (self.aim_target - p.pos).normalized()
         p.cooldown = max(0, p.cooldown - dt)
         self.parry_cooldown = max(0, self.parry_cooldown - dt)

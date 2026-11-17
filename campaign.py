@@ -110,6 +110,7 @@ class CampaignGame(LegacyGame):
         p = Player(pos=Vec(*data["start"]), hp=hp)
         p.weapon = weapon if weapon in self.available_weapons(index) else 1
         self.combat = Combat(CampaignArena(data), p, purification=True, seal_break=True)
+        self.combat.movement_facing = True
         self.combat.element = previous_element if previous_element in self.owned_elements else None
         self.combat.magic_damage = 2
         self.combat.arrows = self.bag.get("arrow_bundle", 0)
@@ -276,7 +277,7 @@ class CampaignGame(LegacyGame):
         c.player.environment_speed = 1
         c.player.pos, c.player.hp = Vec(560, 285), C.MAX_HP
         if self.forge_job:
-            c.player.pos, c.player.facing = Vec(350, 430), Vec(-1, 0)
+            c.player.pos, c.player.facing = Vec(380, 420), Vec(-1, 0)
         c.enemies, c.devices, c.projectiles, c.slashes = [], [], [], []
         c.trail = None
         c.element_skill.pending.clear()
@@ -375,9 +376,9 @@ class CampaignGame(LegacyGame):
             self.bag[key] -= count
         self.forge_job = {'result': result, 'remaining': 5.0}
         self.mode, self.paused, self.inventory_open = 'hub', False, False
-        self.combat.player.pos, self.combat.player.facing = Vec(350, 430), Vec(-1, 0)
+        self.combat.player.pos, self.combat.player.facing = Vec(380, 420), Vec(-1, 0)
         self.combat.player.moving = False
-        self.tell("제작 중 · 5초 동안 원소석을 다듬습니다.", 5)
+        self.tell("제작 중 · 5초 뒤 원소석이 완성됩니다.", 5)
         self.persist("hub")
         return True
 
@@ -481,6 +482,9 @@ class CampaignGame(LegacyGame):
                 if self.forge_job['remaining'] <= 0:
                     self.forge_drop = self.forge_job['result']
                     self.forge_job = None
+                    # 이전 버전에서 대장간 충돌 영역 안에 저장된 캐릭터도 복구한다.
+                    if not self.combat.arena.valid(p.pos, p.radius):
+                        p.pos = Vec(380, 420)
                     self.combat.events.append(('open', Vec(370, 390)))
                     self.tell("제작 완료! 바닥의 " + name(self.forge_drop) + "을 E로 획득하세요.", 6)
                     self.persist('hub')
