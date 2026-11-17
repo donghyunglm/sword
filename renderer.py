@@ -268,7 +268,7 @@ class Renderer:
 
     def scene(self, game):
         combat = game.combat
-        self.soul_ghosts = game.index == 15
+        self.soul_ghosts = (game.index == 15 or getattr(game, "modern_combat", False))
         for pos, direction, element in combat.element_skill.pending:
             self.actor("player", pos, direction, ghost=True, alpha=150)
         for bolt in combat.element_skill.bolts:
@@ -297,7 +297,7 @@ class Renderer:
                 circle(device.pos, device.radius, color, 180, True)
             if device.kind == "terminal":
                 self.text(device.link, device.pos.x - 5, device.pos.y - 8, 16, color)
-        if game.index == 15:
+        if (game.index == 15 or getattr(game, "modern_combat", False)):
             for kind, drop_pos in game.element_drops:
                 color = element_color(kind)
                 circle(drop_pos, 31 + 3 * math.sin(self.visual_time * 5), color, 115)
@@ -317,7 +317,7 @@ class Renderer:
         if combat.trail:
             trail = combat.trail
             alpha = int(55 + 95 * trail.remaining / trail.lifetime)
-            if game.index == 15:
+            if (game.index == 15 or getattr(game, "modern_combat", False)):
                 alpha = int(150 + 65 * trail.remaining / trail.lifetime)
             trail_color = CYAN if trail.element == "fire" else element_color(trail.element, trail.weapon)
             trail_fx = None if trail.element == "fire" else trail.element or ("ice" if trail.weapon == 2 else None)
@@ -326,7 +326,7 @@ class Renderer:
                 if trail_fx:
                     line(a + Vec(0, 3), b + Vec(0, 3), trail_color, alpha // 2)
             visible = trail.visible_points()
-            if game.index == 15 and len(visible) > 7:
+            if (game.index == 15 or getattr(game, "modern_combat", False)) and len(visible) > 7:
                 visible = [visible[round(i * (len(visible) - 1) / 6)] for i in range(7)]
             for i, pos in enumerate(visible):
                 fade = int(alpha * (0.3 + 0.7 * (i + 1) / len(visible)))
@@ -378,7 +378,7 @@ class Renderer:
                                                         visible_reach, 105, angle, 0.85)
             if enemy.state == "charge":
                 line(enemy.pos - enemy.direction * 40, enemy.pos, GOLD, 120)
-            if game.index == 15 and hasattr(enemy, "shield_hp"):
+            if (game.index == 15 or getattr(game, "modern_combat", False)) and hasattr(enemy, "shield_hp"):
                 self.boss_shield(enemy)
                 if enemy.attack == "lunge" and enemy.state in ("tell", "charge"):
                     # 공격 범위를 덮지 않고 몸 앞의 화살표로 돌진 방향만 알린다.
@@ -509,7 +509,7 @@ class Renderer:
                     self.text("PARRY!", pos.x - 40, pos.y + 65, 23, GOLD)
                 if kind == "backstab":
                     self.text("배후 일격 +3", pos.x - 45, pos.y + 80, 20, GOLD)
-            if kind == "element_ice" and game.index == 15:
+            if kind == "element_ice" and (game.index == 15 or getattr(game, "modern_combat", False)):
                 for j in range(4):
                     angle = j * math.tau / 4 + age
                     self.ice_crystal(pos + Vec(math.cos(angle), math.sin(angle)) * age * 65,
@@ -569,7 +569,7 @@ class Renderer:
         self.text("TRAINING" if game.training else game.stage['title'], 325, 715, 23, WHITE)
         if game.trial:
             self.text("체험", 615, 715, 16, CYAN)
-        if game.index == 15 and c.element:
+        if (game.index == 15 or getattr(game, "modern_combat", False)) and c.element:
             self.bank.draw_cell(c.element + "_relic_test", 0, 0, Vec(725, 701), 87, 58)
             self.text("얼음" if c.element == "ice" else "불", 700, 663, 16,
                       element_color(c.element))
@@ -578,7 +578,7 @@ class Renderer:
         ratio = 0 if game.training else min(1, c.kills / max(1, game.goal))
         self.ui("progress_frame", 925, 681, 290, 42)
         self.ui_fill("progress_fill", ratio, 925, 681, 290, 42, 24, 372)
-        if game.index == 1 and game.mode == "play":
+        if game.index == 1 and game.mode == "play" and not getattr(game, "modern_combat", False):
             self.text(f"이정표 {game.beacon_hp}/8", 790, 660, 16, CYAN if game.beacon_hp > 3 else RED)
         elif c.auto_echo and c.trail:
             wait = c.auto_echo_timer
@@ -593,7 +593,7 @@ class Renderer:
             boss = bosses[0]
             self.ui("boss_frame", 560, 603, 480, 74)
             self.ui_fill("boss_fill", boss.hp / boss.max_hp, 560, 603, 480, 74, 95, 220)
-            label = {"guardian": "숲의 수호수", "knight": "봉인 수호기사", "dragon": "침식된 드래곤"}[boss.kind]
+            label = getattr(boss, "name", None) or {"guardian": "숲의 수호수", "knight": "봉인 수호기사", "dragon": "침식된 드래곤"}[boss.kind]
             state = {"tell": "공격 예고", "charge": "돌진", "attack": "공격", "weak": "약점! F 검격", "stunned": "패링 성공 · 반격", "recover": "회복", "approach": "대기"}[boss.state]
             self.text(label + "  /  " + state, 325, 666, 18, GOLD if boss.state == "weak" else WHITE)
         rect(0, 0, C.WIDTH, 78, (9, 17, 27), 245)
@@ -604,11 +604,11 @@ class Renderer:
         self.ui("slash", 260, 39, 59, 59)
         self.text("F", 300, 44, 20, GOLD)
         self.text("기본 검격", 300, 22, 16, WHITE)
-        circle(Vec(460, 39), 22, SOUL if game.index == 15 else MUTED, 165)
+        circle(Vec(460, 39), 22, SOUL if (game.index == 15 or getattr(game, "modern_combat", False)) else MUTED, 165)
         line(Vec(447, 39), Vec(460, 22), SOUL, 180)
         line(Vec(460, 22), Vec(475, 52), SOUL, 180)
         self.text("우클릭", 495, 44, 18, SOUL)
-        self.text("패링" if game.index == 15 else "3-6 패링", 495, 22, 16, WHITE if game.index == 15 else MUTED)
+        self.text("패링" if (game.index == 15 or getattr(game, "modern_combat", False)) else "3-6 패링", 495, 22, 16, WHITE if (game.index == 15 or getattr(game, "modern_combat", False)) else MUTED)
         self.ui("slot_normal", 650, 40, 63, 63)
         if c.skill_element:
             if c.skill_element == "soul":
@@ -623,9 +623,9 @@ class Renderer:
             self.ui(("weapon_basic", "weapon_frost", "weapon_shatter")[player.weapon - 1], 650, 40, 46, 46)
             self.text("대시 경로 잔영 검격", 690, 45, 18, CYAN)
             self.text("자동 발동" if c.auto_echo else "좌클릭으로 잔영 발동", 690, 22, 16, MUTED)
-        self.text("Tab 아이템", 955, 48, 16, MUTED)
+        self.text("I 아이템" if getattr(game, "modern_combat", False) else "Tab 아이템", 955, 48, 16, MUTED)
         self.text("휠 교체 / Esc 메뉴", 920, 24, 14, MUTED)
-        if game.index == 15:
+        if (game.index == 15 or getattr(game, "modern_combat", False)):
             if c.counter_left > 0:
                 self.text(f"반격 {c.counter_left:.1f}초 · 연속 {c.counter_charges}회 · 배후 일격", 350, 83, 18, GOLD)
             else:

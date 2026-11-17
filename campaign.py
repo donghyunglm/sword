@@ -18,6 +18,7 @@ HUB_FACILITIES = (("forge", Vec(265, 465), "대장간"), ("storage", Vec(850, 35
 
 
 class CampaignGame(LegacyGame):
+    modern_combat = True
     def __init__(self, save_path=DEFAULT_PATH):
         super().__init__(save_path)
         self.stages = copy.deepcopy(STAGES)
@@ -381,7 +382,12 @@ class CampaignGame(LegacyGame):
             p = self.combat.player
             if movement.length():
                 p.pos, _ = self.combat.arena.move(p.pos, movement.normalized() * (p.speed * dt), p.radius)
-                p.facing = movement.normalized()
+                if self.combat.aim_target is None:
+                    p.facing = movement.normalized()
+            if self.combat.aim_target is not None:
+                aim = self.combat.aim_target - p.pos
+                if aim.length():
+                    p.facing = aim.normalized()
             p.moving = movement.length() > 0
             return
         if self.mode != "play":

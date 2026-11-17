@@ -2,6 +2,7 @@ import unittest
 from campaign import CampaignGame
 from campaign_save import validate
 from items import RECIPES
+from geometry import Vec
 
 
 class CampaignTests(unittest.TestCase):
@@ -23,6 +24,34 @@ class CampaignTests(unittest.TestCase):
         self.assertTrue(game.give({'ember_fragment': 1}, 'chest'))
         self.assertFalse(game.give({'ember_fragment': 1}, 'chest'))
         self.assertEqual(game.bag['ember_fragment'], 1)
+
+    def test_hub_walk_keeps_facing_the_mouse(self):
+        game = self.game()
+        game.start_trial(0)
+        game.enter_hub()
+        origin = game.combat.player.pos
+        game.combat.aim_target = origin + Vec(200, 0)
+        game.update(0.1, Vec(0, 1))
+        player = game.combat.player
+        self.assertGreater(player.pos.y, origin.y)
+        expected = (game.combat.aim_target - player.pos).normalized()
+        self.assertAlmostEqual(player.facing.x, expected.x)
+        self.assertAlmostEqual(player.facing.y, expected.y)
+        game.combat.aim_target = player.pos + Vec(-200, 0)
+        game.update(0.1)
+        self.assertEqual(player.facing, Vec(-1, 0))
+
+    def test_campaign_dash_moves_independently_of_mouse_aim(self):
+        game = self.game()
+        game.start_trial(14)
+        combat = game.combat
+        origin = combat.player.pos
+        combat.aim_target = origin + Vec(200, 0)
+        self.assertTrue(combat.dash(Vec(0, 1)))
+        game.update(0.02)
+        self.assertGreater(combat.player.pos.y, origin.y)
+        self.assertAlmostEqual(combat.player.pos.x, origin.x)
+        self.assertGreater(combat.player.facing.x, 0.9)
 
     def test_crafting_consumes_materials_once(self):
         game = self.game()

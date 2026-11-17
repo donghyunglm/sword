@@ -22,13 +22,17 @@ class CampaignRenderer(Renderer):
         self.image('door', *game.stage['exit'], 76, 88)
 
     def hud(self, game):
-        rect(0, 650, 1120, 110, INK)
-        self.text(f"HP {game.combat.player.hp}/{6}   {game.stage['id']}  {game.stage['title']}", 35, 716, 26, GOLD)
-        self.text('출구 개방' if game.gate_open else '적 처치 · 상자와 전리품 회수', 650, 715, 20, CYAN)
-        rect(0, 0, 1120, 95, INK)
-        self.text('Space 대시   좌클릭 잔영 발동   우클릭 패링   F 평타   E 획득   I 인벤토리', 40, 63, 18)
-        self.text(f"장착: {game.combat.element or '기본 검'}    화살: {game.bag.get('arrow_bundle', 0)}    휠: 장착 변경", 40, 30, 18, CYAN)
-        if game.toast_left > 0: self.center(game.toast, 125, 16, GOLD)
+        # 기존 하트·아이템 슬롯·쿨타임·패링·반격 HUD를 그대로 사용한다.
+        super().hud(game)
+        rect(780, 652, 340, 108, INK, 255)
+        self.text('출구 개방' if game.gate_open else '적 처치 · 전리품 회수', 790, 722, 18, CYAN)
+        self.text(f"{min(game.combat.kills, game.goal)} / {game.goal}", 965, 711, 26, GOLD)
+        ratio = min(1, game.combat.kills / max(1, game.goal))
+        self.ui('progress_frame', 925, 681, 290, 42)
+        self.ui_fill('progress_fill', ratio, 925, 681, 290, 42, 24, 372)
+        if game.combat.trail:
+            self.text(f"잔영 {game.combat.trail.remaining:.1f}초", 790, 660, 16, CYAN)
+        self.text(f"화살 {game.bag.get('arrow_bundle', 0)}", 35, 550, 16, GOLD)
 
     def draw(self, game):
         if game.mode in ('title', 'select'):
